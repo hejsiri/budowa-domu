@@ -1462,6 +1462,21 @@ input:disabled {
   }
 }
 
+@media (max-width: 560px) {
+  .segmented {
+    display: grid;
+    width: calc(100% - 32px);
+    max-width: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .segmented button {
+    width: 100%;
+    padding: 0 10px;
+    text-align: center;
+  }
+}
+
 @media (max-width: 420px) {
   .brand h1 {
     font-size: 2rem;
