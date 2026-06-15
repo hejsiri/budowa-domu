@@ -337,6 +337,40 @@ async function deleteAttachments(attachments = []) {
   )
 }
 
+function removalPaths(value) {
+  try {
+    const parsed = JSON.parse(String(value || '[]'))
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch {
+    return []
+  }
+}
+
+function filterRemovedAttachments(attachments = [], paths = []) {
+  return attachments.filter((attachment) => !paths.includes(attachment.path))
+}
+
+function costAttachments(cost = {}) {
+  const attachments = Array.isArray(cost.attachments) ? [...cost.attachments] : []
+  if (cost.attachment?.path && !attachments.some((attachment) => attachment.path === cost.attachment.path)) {
+    attachments.push(cost.attachment)
+  }
+  return attachments
+}
+
+function uploadedAttachments(request) {
+  if (Array.isArray(request.files)) {
+    return request.files.map(fileAttachment)
+  }
+
+  return [
+    ...(request.files?.['attachments[]'] || []),
+    ...(request.files?.['documents[]'] || []),
+    ...(request.files?.['images[]'] || []),
+    ...(request.files?.invoice || []),
+  ].map(fileAttachment)
+}
+
 async function readStorageFile(file, fallback) {
   try {
     return JSON.parse(await fs.readFile(file, 'utf8'))
@@ -680,7 +714,12 @@ app.get('/api/file', async (request, response, next) => {
   }
 })
 
-app.post('/api/tasks', upload.array('attachments[]', 8), async (request, response, next) => {
+const attachmentUpload = upload.fields([
+  { name: 'documents[]', maxCount: 30 },
+  { name: 'images[]', maxCount: 40 },
+])
+
+app.post('/api/tasks', attachmentUpload, async (request, response, next) => {
   try {
     const state = await readState()
     const task = {
@@ -692,7 +731,7 @@ app.post('/api/tasks', upload.array('attachments[]', 8), async (request, respons
       startTime: cleanTime(request.body.startTime, '09:00'),
       endTime: cleanTime(request.body.endTime, '10:00'),
       comment: cleanText(request.body.comment),
-      attachments: (request.files || []).map(fileAttachment),
+      attachments: uploadedAttachments(request),
       status: 'todo',
     }
 
@@ -709,10 +748,11 @@ app.post('/api/tasks', upload.array('attachments[]', 8), async (request, respons
   }
 })
 
-app.post('/api/tasks/:id', upload.array('attachments[]', 8), async (request, response, next) => {
+app.post('/api/tasks/:id', attachmentUpload, async (request, response, next) => {
   try {
     const state = await readState()
-    const attachments = (request.files || []).map(fileAttachment)
+    const attachments = uploadedAttachments(request)
+    const removePaths = removalPaths(request.body.removeAttachments)
     let updatedTask = null
 
     state.tasks = state.tasks.map((task) => {
@@ -720,6 +760,7 @@ app.post('/api/tasks/:id', upload.array('attachments[]', 8), async (request, res
         return task
       }
 
+      const removedAttachments = (task.attachments || []).filter((attachment) => removePaths.includes(attachment.path))
       updatedTask = {
         ...task,
         title: cleanText(request.body.title),
@@ -729,8 +770,9 @@ app.post('/api/tasks/:id', upload.array('attachments[]', 8), async (request, res
         startTime: cleanTime(request.body.startTime, '09:00'),
         endTime: cleanTime(request.body.endTime, '10:00'),
         comment: cleanText(request.body.comment),
-        attachments: [...(task.attachments || []), ...attachments],
+        attachments: [...filterRemovedAttachments(task.attachments || [], removePaths), ...attachments],
       }
+      deleteAttachments(removedAttachments).catch(() => undefined)
 
       return updatedTask
     })
@@ -811,7 +853,7 @@ app.delete('/api/tasks/:id', async (request, response, next) => {
   }
 })
 
-app.post('/api/costs', upload.single('invoice'), async (request, response, next) => {
+app.post('/api/costs', attachmentUpload, async (request, response, next) => {
   try {
     const state = await readState()
     const amount = Number(request.body.amount)
@@ -829,13 +871,7 @@ app.post('/api/costs', upload.single('invoice'), async (request, response, next)
       commentHtml: cleanRichText(request.body.commentHtml),
       status,
       paidDate: status === 'paid' ? cleanText(request.body.paidDate, getToday()) : '',
-      attachment: request.file
-        ? {
-            name: request.file.originalname,
-            path: `/uploads/${request.file.filename}`,
-            mimeType: request.file.mimetype,
-          }
-        : undefined,
+      attachments: uploadedAttachments(request),
     }
 
     if (!cost.title || !Number.isFinite(cost.amount) || cost.amount < 0) {
@@ -857,7 +893,8 @@ async function updateCost(request, response, next) {
     const amount = Number(request.body.amount)
     const status = cleanCostStatus(request.body.status)
     const paymentSplit = paymentSplitFromBody(request.body)
-    let previousAttachment
+    const attachments = uploadedAttachments(request)
+    const removePaths = removalPaths(request.body.removeAttachments)
     let updatedCost = null
 
     state.costs = state.costs.map((cost) => {
@@ -865,7 +902,8 @@ async function updateCost(request, response, next) {
         return cost
       }
 
-      previousAttachment = cost.attachment
+      const currentAttachments = Array.isArray(cost.attachments) ? cost.attachments : []
+      const removedAttachments = currentAttachments.filter((attachment) => removePaths.includes(attachment.path))
       updatedCost = {
         ...cost,
         title: cleanText(request.body.title),
@@ -878,15 +916,10 @@ async function updateCost(request, response, next) {
         commentHtml: cleanRichText(request.body.commentHtml),
         status,
         paidDate: status === 'paid' ? cleanText(request.body.paidDate, getToday()) : '',
+        attachments: [...filterRemovedAttachments(currentAttachments, removePaths), ...attachments],
       }
-
-      if (request.file) {
-        updatedCost.attachment = {
-          name: request.file.originalname,
-          path: `/uploads/${request.file.filename}`,
-          mimeType: request.file.mimetype,
-        }
-      }
+      delete updatedCost.attachment
+      deleteAttachments(removedAttachments).catch(() => undefined)
 
       return updatedCost
     })
@@ -898,18 +931,13 @@ async function updateCost(request, response, next) {
 
     await writeState(state)
 
-    if (request.file && previousAttachment?.path) {
-      const invoicePath = path.join(rootDir, previousAttachment.path.replace(/^\//, ''))
-      await fs.rm(invoicePath, { force: true }).catch(() => undefined)
-    }
-
     response.json(state)
   } catch (error) {
     next(error)
   }
 }
 
-app.post('/api/costs/:id', upload.single('invoice'), updateCost)
+app.post('/api/costs/:id', attachmentUpload, updateCost)
 
 app.patch('/api/costs/:id/toggle', async (request, response, next) => {
   try {
@@ -934,7 +962,7 @@ app.patch('/api/costs/:id/toggle', async (request, response, next) => {
   }
 })
 
-app.patch('/api/costs/:id', upload.single('invoice'), updateCost)
+app.patch('/api/costs/:id', attachmentUpload, updateCost)
 
 app.delete('/api/costs/:id', async (request, response, next) => {
   try {
@@ -943,10 +971,7 @@ app.delete('/api/costs/:id', async (request, response, next) => {
     state.costs = state.costs.filter((item) => item.id !== request.params.id)
     await writeState(state)
 
-    if (cost?.attachment?.path) {
-      const invoicePath = path.join(rootDir, cost.attachment.path.replace(/^\//, ''))
-      await fs.rm(invoicePath, { force: true }).catch(() => undefined)
-    }
+    await deleteAttachments(cost?.attachments)
 
     response.json(state)
   } catch (error) {

@@ -817,6 +817,51 @@ input:disabled {
   box-shadow: 0 0 0 4px rgba(37, 99, 135, 0.12);
 }
 
+.attachment-edit-list {
+  display: grid;
+  gap: 7px;
+}
+
+.attachment-edit-list > span {
+  color: #697683;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.attachment-edit-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--accent-2);
+  background: #ffffff;
+}
+
+.attachment-edit-row button {
+  min-width: 0;
+  border: 0;
+  color: var(--accent);
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.attachment-edit-row .attachment-remove {
+  color: #b94636;
+}
+
 .primary-action {
   display: inline-flex;
   align-items: center;

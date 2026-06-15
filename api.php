@@ -517,6 +517,46 @@ function deleteAttachmentFiles(array $attachments)
     }
 }
 
+function removalPaths($value): array
+{
+    $decoded = json_decode((string)($value ?? '[]'), true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    return array_values(array_filter(array_map('strval', $decoded)));
+}
+
+function filterRemovedAttachments(array $attachments, array $removePaths): array
+{
+    return array_values(array_filter(
+        $attachments,
+        static function (array $attachment) use ($removePaths): bool {
+            return !in_array((string)($attachment['path'] ?? ''), $removePaths, true);
+        }
+    ));
+}
+
+function costAttachments(array $cost): array
+{
+    $attachments = is_array($cost['attachments'] ?? null) ? $cost['attachments'] : [];
+    if (isset($cost['attachment']) && is_array($cost['attachment'])) {
+        $legacyPath = (string)($cost['attachment']['path'] ?? '');
+        $exists = false;
+        foreach ($attachments as $attachment) {
+            if ((string)($attachment['path'] ?? '') === $legacyPath) {
+                $exists = true;
+                break;
+            }
+        }
+        if (!$exists) {
+            $attachments[] = $cost['attachment'];
+        }
+    }
+
+    return $attachments;
+}
+
 function respond($payload, int $status = 200)
 {
     http_response_code($status);
@@ -715,11 +755,24 @@ try {
             respond(['message' => 'Brakuje nazwy zadania.'], 400);
         }
 
-        $attachments = saveUploadedFiles('attachments', $uploadsDir, 'zadanie');
+        $attachments = array_merge(
+            saveUploadedFiles('attachments', $uploadsDir, 'zadanie'),
+            saveUploadedFiles('documents', $uploadsDir, 'dokument'),
+            saveUploadedFiles('images', $uploadsDir, 'zdjecie')
+        );
+        $removePaths = removalPaths($_POST['removeAttachments'] ?? '[]');
 
         if ($id !== '') {
             foreach ($state['tasks'] as &$task) {
                 if (($task['id'] ?? '') === $id) {
+                    $removedAttachments = array_values(array_filter(
+                        $task['attachments'] ?? [],
+                        static function (array $attachment) use ($removePaths): bool {
+                            return in_array((string)($attachment['path'] ?? ''), $removePaths, true);
+                        }
+                    ));
+                    $existingAttachments = filterRemovedAttachments($task['attachments'] ?? [], $removePaths);
+                    deleteAttachmentFiles($removedAttachments);
                     $task['title'] = $title;
                     $task['area'] = cleanText($_POST['area'] ?? '', 'Inne');
                     $task['priority'] = cleanPriority($_POST['priority'] ?? '');
@@ -727,7 +780,7 @@ try {
                     $task['startTime'] = cleanTime($_POST['startTime'] ?? '', '09:00');
                     $task['endTime'] = cleanTime($_POST['endTime'] ?? '', '10:00');
                     $task['comment'] = cleanText($_POST['comment'] ?? '');
-                    $task['attachments'] = array_values(array_merge($task['attachments'] ?? [], $attachments));
+                    $task['attachments'] = array_values(array_merge($existingAttachments, $attachments));
                 }
             }
             unset($task);
@@ -820,31 +873,26 @@ try {
             respond(['message' => 'Podaj opis i prawidlowa kwote kosztu.'], 400);
         }
 
-        $attachment = null;
-        if (isset($_FILES['invoice']) && is_uploaded_file($_FILES['invoice']['tmp_name'])) {
-            $originalName = basename((string)$_FILES['invoice']['name']);
-            $extension = pathinfo($originalName, PATHINFO_EXTENSION);
-            $baseName = preg_replace('/[^a-zA-Z0-9-]+/', '-', pathinfo($originalName, PATHINFO_FILENAME)) ?: 'faktura';
-            $fileName = time() . '-' . trim(substr($baseName, 0, 60), '-') . ($extension ? '.' . $extension : '');
-            $target = $uploadsDir . '/' . $fileName;
-
-            if (!move_uploaded_file($_FILES['invoice']['tmp_name'], $target)) {
-                respond(['message' => 'Nie udalo sie zapisac faktury.'], 500);
-            }
-
-            $attachment = [
-                'name' => $originalName,
-                'path' => 'uploads/' . $fileName,
-                'mimeType' => (string)($_FILES['invoice']['type'] ?? 'application/octet-stream'),
-            ];
-        }
+        $attachments = array_merge(
+            saveUploadedFiles('invoice', $uploadsDir, 'faktura'),
+            saveUploadedFiles('documents', $uploadsDir, 'dokument'),
+            saveUploadedFiles('images', $uploadsDir, 'zdjecie')
+        );
+        $removePaths = removalPaths($_POST['removeAttachments'] ?? '[]');
 
         if ($id !== '') {
             $paymentSplit = paymentSplitFromPost();
-            $previousAttachment = null;
             foreach ($state['costs'] as &$cost) {
                 if (($cost['id'] ?? '') === $id) {
-                    $previousAttachment = $cost['attachment'] ?? null;
+                    $currentAttachments = costAttachments($cost);
+                    $removedAttachments = array_values(array_filter(
+                        $currentAttachments,
+                        static function (array $attachment) use ($removePaths): bool {
+                            return in_array((string)($attachment['path'] ?? ''), $removePaths, true);
+                        }
+                    ));
+                    $existingAttachments = filterRemovedAttachments($currentAttachments, $removePaths);
+                    deleteAttachmentFiles($removedAttachments);
                     $cost['title'] = $title;
                     $cost['area'] = cleanText($_POST['area'] ?? '', 'Stan surowy');
                     $cost['category'] = cleanText($_POST['category'] ?? '', 'Inne');
@@ -855,20 +903,11 @@ try {
                     $cost['commentHtml'] = cleanRichText($_POST['commentHtml'] ?? '');
                     $cost['status'] = $status;
                     $cost['paidDate'] = $status === 'paid' ? cleanText($_POST['paidDate'] ?? '', date('Y-m-d')) : '';
-
-                    if ($attachment !== null) {
-                        $cost['attachment'] = $attachment;
-                    }
+                    $cost['attachments'] = array_values(array_merge($existingAttachments, $attachments));
+                    unset($cost['attachment']);
                 }
             }
             unset($cost);
-
-            if ($attachment !== null && isset($previousAttachment['path'])) {
-                $invoicePath = __DIR__ . '/' . ltrim((string)$previousAttachment['path'], '/');
-                if (is_file($invoicePath)) {
-                    unlink($invoicePath);
-                }
-            }
 
             writeState($dataFile, $state);
             respond($state);
@@ -887,11 +926,8 @@ try {
             'commentHtml' => cleanRichText($_POST['commentHtml'] ?? ''),
             'status' => $status,
             'paidDate' => $status === 'paid' ? cleanText($_POST['paidDate'] ?? '', date('Y-m-d')) : '',
+            'attachments' => $attachments,
         ];
-
-        if ($attachment !== null) {
-            $cost['attachment'] = $attachment;
-        }
 
         array_unshift($state['costs'], $cost);
         writeState($dataFile, $state);
@@ -933,11 +969,8 @@ try {
             }
         ));
 
-        if (isset($deleted['attachment']['path'])) {
-            $invoicePath = __DIR__ . '/' . ltrim((string)$deleted['attachment']['path'], '/');
-            if (is_file($invoicePath)) {
-                unlink($invoicePath);
-            }
+        if (is_array($deleted)) {
+            deleteAttachmentFiles(costAttachments($deleted));
         }
 
         writeState($dataFile, $state);

@@ -12,7 +12,6 @@ import {
   Lock,
   LogOut,
   Mail,
-  Paperclip,
   Plus,
   Settings,
   StickyNote,
@@ -74,6 +73,7 @@ type Cost = {
   status: PaymentStatus
   paidDate: string
   attachment?: Attachment
+  attachments?: Attachment[]
 }
 
 type SettingsState = {
@@ -273,6 +273,64 @@ function isPdfAttachment(attachment: Attachment) {
   return attachment.mimeType === 'application/pdf' || attachment.name.toLowerCase().endsWith('.pdf')
 }
 
+function costAttachments(cost: Cost) {
+  const attachments = [...(cost.attachments || [])]
+  if (cost.attachment && !attachments.some((attachment) => attachment.path === cost.attachment?.path)) {
+    attachments.push(cost.attachment)
+  }
+
+  return attachments
+}
+
+function fileListLabel(files: File[], emptyLabel: string) {
+  return files.length > 0 ? files.map((file) => file.name).join(', ') : emptyLabel
+}
+
+async function resizeImageFile(file: File, maxWidth = 1920, maxHeight = 1080) {
+  if (!file.type.startsWith('image/')) {
+    return file
+  }
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const element = new Image()
+    element.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(element)
+    }
+    element.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Nie udało się przygotować zdjęcia.'))
+    }
+    element.src = url
+  })
+
+  const ratio = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight)
+  if (ratio >= 1) {
+    return file
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(image.naturalWidth * ratio)
+  canvas.height = Math.round(image.naturalHeight * ratio)
+  const context = canvas.getContext('2d')
+  if (!context) {
+    return file
+  }
+
+  context.drawImage(image, 0, 0, canvas.width, canvas.height)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, file.type || 'image/jpeg', 0.86))
+  return blob ? new File([blob], file.name, { type: file.type || 'image/jpeg', lastModified: Date.now() }) : file
+}
+
+async function prepareImageFiles(files: File[]) {
+  return Promise.all(files.filter((file) => file.type.startsWith('image/')).map((file) => resizeImageFile(file)))
+}
+
+function documentFiles(files: File[]) {
+  return files.filter((file) => !file.type.startsWith('image/'))
+}
+
 function taskPriority(priority: string) {
   return priority === 'Pilne' ? 'Pilne' : 'Normalne'
 }
@@ -368,8 +426,12 @@ function App() {
   const [notePreview, setNotePreview] = useState<NotePreview | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
-  const [invoice, setInvoice] = useState<File | undefined>()
-  const [taskAttachments, setTaskAttachments] = useState<File[]>([])
+  const [taskDocumentFiles, setTaskDocumentFiles] = useState<File[]>([])
+  const [taskImageFiles, setTaskImageFiles] = useState<File[]>([])
+  const [costDocumentFiles, setCostDocumentFiles] = useState<File[]>([])
+  const [costImageFiles, setCostImageFiles] = useState<File[]>([])
+  const [taskRemovePaths, setTaskRemovePaths] = useState<string[]>([])
+  const [costRemovePaths, setCostRemovePaths] = useState<string[]>([])
   const [taskDropActive, setTaskDropActive] = useState(false)
   const [invoiceDropActive, setInvoiceDropActive] = useState(false)
   const costCommentRef = useRef<HTMLDivElement | null>(null)
@@ -487,7 +549,9 @@ function App() {
       endTime: '10:00',
       comment: '',
     })
-    setTaskAttachments([])
+    setTaskDocumentFiles([])
+    setTaskImageFiles([])
+    setTaskRemovePaths([])
   }
 
   function resetCostForm() {
@@ -504,7 +568,9 @@ function App() {
       status: 'planned',
       paidDate: '',
     })
-    setInvoice(undefined)
+    setCostDocumentFiles([])
+    setCostImageFiles([])
+    setCostRemovePaths([])
   }
 
   function closeModal() {
@@ -534,6 +600,10 @@ function App() {
     setNotePreview(null)
   }
 
+  function togglePath(paths: string[], path: string) {
+    return paths.includes(path) ? paths.filter((current) => current !== path) : [...paths, path]
+  }
+
   function openNewTaskModal() {
     resetTaskForm()
     setEditingTaskId(null)
@@ -550,7 +620,9 @@ function App() {
       endTime: task.endTime || '10:00',
       comment: task.comment || '',
     })
-    setTaskAttachments([])
+    setTaskDocumentFiles([])
+    setTaskImageFiles([])
+    setTaskRemovePaths([])
     setEditingTaskId(task.id)
     setActiveModal('task')
   }
@@ -579,7 +651,9 @@ function App() {
       status: cost.status,
       paidDate: cost.paidDate,
     })
-    setInvoice(undefined)
+    setCostDocumentFiles([])
+    setCostImageFiles([])
+    setCostRemovePaths([])
     setEditingCostId(cost.id)
     setActiveModal('cost')
   }
@@ -624,6 +698,10 @@ function App() {
   const filteredCosts = state.costs.filter((cost) => {
     return costView === 'all' ? true : cost.status === costView
   })
+  const editingTask = editingTaskId ? state.tasks.find((task) => task.id === editingTaskId) : undefined
+  const editingCost = editingCostId ? state.costs.find((cost) => cost.id === editingCostId) : undefined
+  const editingTaskAttachments = (editingTask?.attachments || []).filter((attachment) => !taskRemovePaths.includes(attachment.path))
+  const editingCostAttachments = editingCost ? costAttachments(editingCost).filter((attachment) => !costRemovePaths.includes(attachment.path)) : []
 
   async function runServerAction(action: () => Promise<AppState | Task | Cost>) {
     setError('')
@@ -760,7 +838,9 @@ function App() {
     body.append('startTime', taskForm.startTime)
     body.append('endTime', taskForm.endTime)
     body.append('comment', taskForm.comment)
-    taskAttachments.forEach((file) => body.append('attachments[]', file))
+    body.append('removeAttachments', JSON.stringify(taskRemovePaths))
+    taskDocumentFiles.forEach((file) => body.append('documents[]', file))
+    taskImageFiles.forEach((file) => body.append('images[]', file))
 
     const saved = await runServerAction(() =>
       requestJson<Task | AppState>(apiEndpoint('tasks', editingTaskId || undefined), {
@@ -788,28 +868,34 @@ function App() {
     runServerAction(() => requestJson<AppState>(apiEndpoint('tasks', task.id), { method: 'DELETE' }))
   }
 
-  function onTaskAttachmentsChange(event: ChangeEvent<HTMLInputElement>) {
-    setTaskAttachments(Array.from(event.target.files || []))
+  function onDocumentFilesChange(setter: (files: File[]) => void) {
+    return (event: ChangeEvent<HTMLInputElement>) => {
+      setter(documentFiles(Array.from(event.target.files || [])))
+      event.target.value = ''
+    }
   }
 
-  function onInvoiceChange(event: ChangeEvent<HTMLInputElement>) {
-    setInvoice(event.target.files?.[0])
+  function onImageFilesChange(setter: (files: File[]) => void) {
+    return async (event: ChangeEvent<HTMLInputElement>) => {
+      setter(await prepareImageFiles(Array.from(event.target.files || [])))
+      event.target.value = ''
+    }
   }
 
-  function onTaskAttachmentsDrop(event: DragEvent<HTMLLabelElement>) {
+  async function onTaskAttachmentsDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
     setTaskDropActive(false)
-    setTaskAttachments(Array.from(event.dataTransfer.files).filter((file) => {
-      return file.type.startsWith('image/') || file.type === 'application/pdf'
-    }))
+    const files = Array.from(event.dataTransfer.files)
+    setTaskDocumentFiles(documentFiles(files))
+    setTaskImageFiles(await prepareImageFiles(files))
   }
 
-  function onInvoiceDrop(event: DragEvent<HTMLLabelElement>) {
+  async function onInvoiceDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
     setInvoiceDropActive(false)
-    setInvoice(Array.from(event.dataTransfer.files).find((file) => {
-      return file.type.startsWith('image/') || file.type === 'application/pdf'
-    }))
+    const files = Array.from(event.dataTransfer.files)
+    setCostDocumentFiles(documentFiles(files))
+    setCostImageFiles(await prepareImageFiles(files))
   }
 
   async function addCost(event: FormEvent<HTMLFormElement>) {
@@ -841,9 +927,9 @@ function App() {
     body.append('commentHtml', sanitizeRichTextHtml(costCommentRef.current?.innerHTML || costForm.commentHtml))
     body.append('status', costForm.status)
     body.append('paidDate', costForm.paidDate)
-    if (invoice) {
-      body.append('invoice', invoice)
-    }
+    body.append('removeAttachments', JSON.stringify(costRemovePaths))
+    costDocumentFiles.forEach((file) => body.append('documents[]', file))
+    costImageFiles.forEach((file) => body.append('images[]', file))
 
     const saved = await runServerAction(() =>
       requestJson<Cost | AppState>(apiEndpoint('costs', editingCostId || undefined), {
@@ -1380,60 +1466,78 @@ function App() {
           <div className="list">
             {isLoading ? <p className="empty">Ładuję wydatki z serwera...</p> : null}
             {!isLoading && filteredCosts.length === 0 ? <p className="empty">Brak wydatków w tym widoku.</p> : null}
-            {filteredCosts.map((cost) => (
-              <article className="item-card cost-card" key={cost.id}>
-                <button
-                  className={`status-dot ${cost.status}`}
-                  onClick={() => toggleCost(cost.id)}
-                  title={costToggleTitle(cost.status)}
-                >
-                  {cost.status === 'planned' && <Hourglass size={15} />}
-                  {cost.status === 'paid' && <Check size={16} />}
-                </button>
-                <div className="item-main">
-                  <div className="item-title-row">
-                    <h3>{cost.title}</h3>
-                    <strong className="amount-badge">{formatCurrency(cost.amount)}</strong>
-                  </div>
-                  <p>{cost.area || 'Fundamenty'} · {cost.category}</p>
-                  <p>{costStatusLabel(cost)}</p>
-                  <p className="cost-split">
-                    {costSplitLabel(cost, settings)}
-                  </p>
-                </div>
-                <div className="item-actions">
-                  <strong className="amount-badge amount-badge-mobile">{formatCurrency(cost.amount)}</strong>
-                  {cost.commentHtml && (
+            {filteredCosts.map((cost) => {
+                const attachments = costAttachments(cost)
+                const imageAttachments = attachments.filter(isImageAttachment)
+                const documentAttachments = attachments.filter((attachment) => !isImageAttachment(attachment))
+                const documentLabel = documentAttachments.every(isPdfAttachment) ? 'PDF' : 'Dokumenty'
+
+                return (
+                  <article className="item-card cost-card" key={cost.id}>
                     <button
-                      className="icon-button note-button"
-                      onClick={() => setNotePreview({ title: cost.title, commentHtml: cost.commentHtml || '' })}
-                      title="Pokaż notatkę"
+                      className={`status-dot ${cost.status}`}
+                      onClick={() => toggleCost(cost.id)}
+                      title={costToggleTitle(cost.status)}
                     >
-                      <StickyNote size={17} />
+                      {cost.status === 'planned' && <Hourglass size={15} />}
+                      {cost.status === 'paid' && <Check size={16} />}
                     </button>
-                  )}
-                  {cost.attachment && (
-                    <button
-                      className="icon-button attachment-button"
-                      onClick={() => setAttachmentPreview(cost.attachment || null)}
-                      title="Pokaż załącznik"
-                    >
-                      {isImageAttachment(cost.attachment) ? <ImageIcon size={17} /> : <Paperclip size={17} />}
-                    </button>
-                  )}
-                  <button
-                    className="icon-button edit-button"
-                    onClick={() => openEditCostModal(cost)}
-                    title="Edytuj wydatek"
-                  >
-                    <SquarePen size={17} />
-                  </button>
-                  <button className="icon-button" onClick={() => deleteCost(cost)} title="Usuń wydatek">
-                    <Trash size={18} />
-                  </button>
-                </div>
-              </article>
-            ))}
+                    <div className="item-main">
+                      <div className="item-title-row">
+                        <h3>{cost.title}</h3>
+                        <strong className="amount-badge">{formatCurrency(cost.amount)}</strong>
+                      </div>
+                      <p>{cost.area || 'Fundamenty'} · {cost.category}</p>
+                      <p>{costStatusLabel(cost)}</p>
+                      <p className="cost-split">
+                        {costSplitLabel(cost, settings)}
+                      </p>
+                    </div>
+                    <div className="item-actions">
+                      <strong className="amount-badge amount-badge-mobile">{formatCurrency(cost.amount)}</strong>
+                      {cost.commentHtml && (
+                        <button
+                          className="icon-button note-button"
+                          onClick={() => setNotePreview({ title: cost.title, commentHtml: cost.commentHtml || '' })}
+                          title="Pokaż notatkę"
+                        >
+                          <StickyNote size={17} />
+                        </button>
+                      )}
+                      {imageAttachments.length > 0 && (
+                        <button
+                          className="icon-button attachment-button attachment-group-button"
+                          onClick={() => openAttachmentGroup(cost.title, 'Obrazy', imageAttachments)}
+                          title={`Pokaż obrazy (${imageAttachments.length})`}
+                        >
+                          <ImageIcon size={17} />
+                          {imageAttachments.length > 1 && <span className="attachment-count">{imageAttachments.length}</span>}
+                        </button>
+                      )}
+                      {documentAttachments.length > 0 && (
+                        <button
+                          className="icon-button attachment-button attachment-group-button"
+                          onClick={() => openAttachmentGroup(cost.title, documentLabel, documentAttachments)}
+                          title={`Pokaż ${documentLabel.toLowerCase()} (${documentAttachments.length})`}
+                        >
+                          <FileText size={17} />
+                          {documentAttachments.length > 1 && <span className="attachment-count">{documentAttachments.length}</span>}
+                        </button>
+                      )}
+                      <button
+                        className="icon-button edit-button"
+                        onClick={() => openEditCostModal(cost)}
+                        title="Edytuj wydatek"
+                      >
+                        <SquarePen size={17} />
+                      </button>
+                      <button className="icon-button" onClick={() => deleteCost(cost)} title="Usuń wydatek">
+                        <Trash size={18} />
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
           </div>
         </section>
         )}
@@ -1644,6 +1748,26 @@ function App() {
                     rows={4}
                   />
                 </label>
+                {editingTaskId && editingTaskAttachments.length > 0 && (
+                  <div className="attachment-edit-list wide">
+                    <span>Obecne załączniki</span>
+                    {editingTaskAttachments.map((attachment) => (
+                      <div className="attachment-edit-row" key={attachment.path}>
+                        {isImageAttachment(attachment) ? <ImageIcon size={16} /> : <FileText size={16} />}
+                        <button type="button" onClick={() => setAttachmentPreview(attachment)}>
+                          {attachment.name}
+                        </button>
+                        <button
+                          type="button"
+                          className="attachment-remove"
+                          onClick={() => setTaskRemovePaths((paths) => togglePath(paths, attachment.path))}
+                        >
+                          Usuń
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <label
                   className={`file-input wide drop-input ${taskDropActive ? 'is-dragging' : ''}`}
                   onDragOver={(event) => {
@@ -1653,15 +1777,27 @@ function App() {
                   onDragLeave={() => setTaskDropActive(false)}
                   onDrop={onTaskAttachmentsDrop}
                 >
-                  <span>{editingTaskId ? 'Nowe załączniki' : 'Załączniki'}</span>
-                  <input type="file" accept="image/*,.pdf" multiple onChange={onTaskAttachmentsChange} />
+                  <span>{editingTaskId ? 'Nowe dokumenty' : 'Dokumenty'}</span>
+                  <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,application/pdf" multiple onChange={onDocumentFilesChange(setTaskDocumentFiles)} />
                   <em>
-                    <Paperclip size={16} />
-                    {taskAttachments.length > 0
-                      ? taskAttachments.map((file) => file.name).join(', ')
-                      : editingTaskId
-                        ? 'Zostaw bez zmian albo przeciągnij pliki'
-                        : 'Dodaj lub przeciągnij PDF albo zdjęcia'}
+                    <FileText size={16} />
+                    {fileListLabel(taskDocumentFiles, editingTaskId ? 'Dodaj lub przeciągnij dokumenty' : 'Dodaj dokumenty')}
+                  </em>
+                </label>
+                <label
+                  className={`file-input wide drop-input ${taskDropActive ? 'is-dragging' : ''}`}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setTaskDropActive(true)
+                  }}
+                  onDragLeave={() => setTaskDropActive(false)}
+                  onDrop={onTaskAttachmentsDrop}
+                >
+                  <span>{editingTaskId ? 'Nowe zdjęcia' : 'Zdjęcia'}</span>
+                  <input type="file" accept="image/*" multiple onChange={onImageFilesChange(setTaskImageFiles)} />
+                  <em>
+                    <ImageIcon size={16} />
+                    {fileListLabel(taskImageFiles, editingTaskId ? 'Dodaj lub przeciągnij zdjęcia' : 'Dodaj zdjęcia')}
                   </em>
                 </label>
                 <div className="modal-actions">
@@ -1820,6 +1956,26 @@ function App() {
                     dangerouslySetInnerHTML={{ __html: costForm.commentHtml }}
                   />
                 </label>
+                {editingCostId && editingCostAttachments.length > 0 && (
+                  <div className="attachment-edit-list wide">
+                    <span>Obecne załączniki</span>
+                    {editingCostAttachments.map((attachment) => (
+                      <div className="attachment-edit-row" key={attachment.path}>
+                        {isImageAttachment(attachment) ? <ImageIcon size={16} /> : <FileText size={16} />}
+                        <button type="button" onClick={() => setAttachmentPreview(attachment)}>
+                          {attachment.name}
+                        </button>
+                        <button
+                          type="button"
+                          className="attachment-remove"
+                          onClick={() => setCostRemovePaths((paths) => togglePath(paths, attachment.path))}
+                        >
+                          Usuń
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <label
                   className={`file-input wide drop-input ${invoiceDropActive ? 'is-dragging' : ''}`}
                   onDragOver={(event) => {
@@ -1829,11 +1985,27 @@ function App() {
                   onDragLeave={() => setInvoiceDropActive(false)}
                   onDrop={onInvoiceDrop}
                 >
-                  <span>{editingCostId ? 'Nowa faktura' : 'Faktura'}</span>
-                  <input type="file" accept="image/*,.pdf" onChange={onInvoiceChange} />
+                  <span>{editingCostId ? 'Nowe dokumenty' : 'Dokumenty'}</span>
+                  <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,application/pdf" multiple onChange={onDocumentFilesChange(setCostDocumentFiles)} />
                   <em>
-                    <Paperclip size={16} />
-                    {invoice ? invoice.name : editingCostId ? 'Zostaw bez zmian albo przeciągnij plik' : 'Dodaj lub przeciągnij plik'}
+                    <FileText size={16} />
+                    {fileListLabel(costDocumentFiles, editingCostId ? 'Dodaj lub przeciągnij dokumenty' : 'Dodaj dokumenty')}
+                  </em>
+                </label>
+                <label
+                  className={`file-input wide drop-input ${invoiceDropActive ? 'is-dragging' : ''}`}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setInvoiceDropActive(true)
+                  }}
+                  onDragLeave={() => setInvoiceDropActive(false)}
+                  onDrop={onInvoiceDrop}
+                >
+                  <span>{editingCostId ? 'Nowe zdjęcia' : 'Zdjęcia'}</span>
+                  <input type="file" accept="image/*" multiple onChange={onImageFilesChange(setCostImageFiles)} />
+                  <em>
+                    <ImageIcon size={16} />
+                    {fileListLabel(costImageFiles, editingCostId ? 'Dodaj lub przeciągnij zdjęcia' : 'Dodaj zdjęcia')}
                   </em>
                 </label>
                 <div className="modal-actions">
