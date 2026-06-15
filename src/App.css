@@ -9,10 +9,16 @@
 }
 
 .app-footer a {
+  align-items: center;
+  gap: 7px;
   color: #5d6b78;
   font-size: 0.82rem;
   font-weight: 800;
   text-decoration: none;
+}
+
+.app-footer svg {
+  flex: 0 0 auto;
 }
 
 .app-footer a:hover {
