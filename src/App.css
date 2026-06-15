@@ -1000,6 +1000,7 @@ input:disabled {
 .cost-split {
   color: var(--accent);
   font-size: 0.8rem;
+  font-weight: 400;
 }
 
 .quick-split {
