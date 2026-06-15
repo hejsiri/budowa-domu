@@ -167,7 +167,10 @@
 
 .auth-notice {
   width: 100%;
-  margin: 0 0 14px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
 .logout-button {
