@@ -632,6 +632,15 @@ input:disabled {
   transform: translateY(-2px);
 }
 
+.task-card.priority-pilne {
+  border-color: #efc7c1;
+  background: #fff4f2;
+}
+
+.task-card.priority-pilne:hover {
+  border-color: #e8aea5;
+}
+
 .item-main {
   min-width: 0;
   flex: 1;

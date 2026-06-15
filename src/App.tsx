@@ -830,7 +830,7 @@ function App() {
             {isLoading ? <p className="empty">Laduje dane z serwera...</p> : null}
             {!isLoading && filteredTasks.length === 0 ? <p className="empty">Brak zadan w tym widoku.</p> : null}
             {filteredTasks.map((task) => (
-              <article className="item-card" key={task.id}>
+              <article className={`item-card task-card priority-${task.priority.toLowerCase()}`} key={task.id}>
                 <button
                   className={`status-dot ${task.status}`}
                   onClick={() => toggleTask(task.id)}
