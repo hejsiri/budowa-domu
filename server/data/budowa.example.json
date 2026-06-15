@@ -208,5 +208,11 @@
       "status": "paid",
       "paidDate": "2026-06-05"
     }
-  ]
+  ],
+  "settings": {
+    "investors": {
+      "primary": "Ja",
+      "partner": "Drugi inwestor"
+    }
+  }
 }

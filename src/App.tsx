@@ -12,6 +12,7 @@ import {
   Mail,
   Paperclip,
   Plus,
+  Settings,
   SquarePen,
   Trash,
   X,
@@ -21,7 +22,7 @@ import './App.css'
 type TaskStatus = 'todo' | 'done'
 type PaymentStatus = 'unpaid' | 'paid'
 type CostPayer = 'me' | 'partner' | 'half' | 'custom'
-type ActiveSection = 'tasks' | 'costs'
+type ActiveSection = 'tasks' | 'costs' | 'settings'
 type AuthMode = 'login' | 'register' | 'verify'
 
 type AuthStatus = {
@@ -61,12 +62,27 @@ type Cost = {
   attachment?: Attachment
 }
 
+type SettingsState = {
+  investors: {
+    primary: string
+    partner: string
+  }
+}
+
 type AppState = {
   tasks: Task[]
   costs: Cost[]
+  settings?: SettingsState
 }
 
-const emptyState: AppState = { tasks: [], costs: [] }
+const defaultSettings: SettingsState = {
+  investors: {
+    primary: 'Ja',
+    partner: 'Drugi inwestor',
+  },
+}
+
+const emptyState: AppState = { tasks: [], costs: [], settings: defaultSettings }
 
 const numberParts = new Intl.NumberFormat('pl-PL', {
   useGrouping: false,
@@ -96,9 +112,12 @@ function normalizeShare(value: number) {
   return Math.min(100, Math.max(0, value))
 }
 
-function costSplit(cost: Pick<Cost, 'payer' | 'investorShare' | 'partnerShare'>) {
+function costSplit(cost: Pick<Cost, 'payer' | 'investorShare' | 'partnerShare'>, settings = defaultSettings) {
+  const primaryName = settings.investors.primary || defaultSettings.investors.primary
+  const partnerName = settings.investors.partner || defaultSettings.investors.partner
+
   if (cost.payer === 'partner') {
-    return { label: 'Płaci drugi inwestor', investorShare: 0, partnerShare: 100 }
+    return { label: `Płaci ${partnerName}`, investorShare: 0, partnerShare: 100 }
   }
 
   if (cost.payer === 'half') {
@@ -114,7 +133,7 @@ function costSplit(cost: Pick<Cost, 'payer' | 'investorShare' | 'partnerShare'>)
     }
   }
 
-  return { label: 'Płacę ja', investorShare: 100, partnerShare: 0 }
+  return { label: `Płaci ${primaryName}`, investorShare: 100, partnerShare: 0 }
 }
 
 const today = new Date().toISOString().slice(0, 10)
@@ -202,13 +221,18 @@ function App() {
     status: 'unpaid' as PaymentStatus,
     paidDate: '',
   })
+  const [settingsForm, setSettingsForm] = useState(defaultSettings.investors)
+
+  const settings = state.settings || defaultSettings
 
   async function refreshState() {
     setIsLoading(true)
     setError('')
 
     try {
-      setState(await requestJson<AppState>(apiEndpoint('state')))
+      const nextState = await requestJson<AppState>(apiEndpoint('state'))
+      setState({ ...nextState, settings: nextState.settings || defaultSettings })
+      setSettingsForm((nextState.settings || defaultSettings).investors)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie pobrac danych.')
     } finally {
@@ -321,7 +345,7 @@ function App() {
       category: cost.category,
       amount: String(cost.amount),
       payer: cost.payer || 'me',
-      investorShare: String(costSplit(cost).investorShare),
+      investorShare: String(costSplit(cost, settings).investorShare),
       status: cost.status,
       paidDate: cost.paidDate,
     })
@@ -361,7 +385,7 @@ function App() {
     try {
       const result = await action()
       if ('tasks' in result && 'costs' in result) {
-        setState(result)
+        setState({ ...result, settings: result.settings || settings })
       } else {
         await refreshState()
       }
@@ -453,6 +477,17 @@ function App() {
 
   function deleteCost(id: string) {
     runServerAction(() => requestJson<AppState>(apiEndpoint('costs', id), { method: 'DELETE' }))
+  }
+
+  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await runServerAction(() =>
+      requestJson<AppState>(apiEndpoint('settings'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ investors: settingsForm }),
+      }),
+    )
   }
 
   async function startRegistration(event: FormEvent<HTMLFormElement>) {
@@ -748,6 +783,17 @@ function App() {
             <BanknoteArrowDown size={18} />
             Wydatki
           </button>
+          <button
+            className={activeSection === 'settings' ? 'active' : ''}
+            role="tab"
+            aria-selected={activeSection === 'settings'}
+            aria-controls="settings-panel"
+            id="settings-tab"
+            onClick={() => setActiveSection('settings')}
+          >
+            <Settings size={18} />
+            Ustawienia
+          </button>
         </nav>
       </header>
 
@@ -890,9 +936,10 @@ function App() {
                       : 'do zaplaty'}
                   </p>
                   <p className="cost-split">
-                    {costSplit(cost).label}: ja {formatCurrency((cost.amount * costSplit(cost).investorShare) / 100)}
-                    , drugi inwestor{' '}
-                    {formatCurrency((cost.amount * costSplit(cost).partnerShare) / 100)}
+                    {costSplit(cost, settings).label}: {settings.investors.primary}{' '}
+                    {formatCurrency((cost.amount * costSplit(cost, settings).investorShare) / 100)}
+                    , {settings.investors.partner}{' '}
+                    {formatCurrency((cost.amount * costSplit(cost, settings).partnerShare) / 100)}
                   </p>
                   {cost.attachment && (
                     <a
@@ -920,6 +967,45 @@ function App() {
               </article>
             ))}
           </div>
+        </section>
+        )}
+
+        {activeSection === 'settings' && (
+        <section className="module" id="settings-panel" role="tabpanel" aria-labelledby="settings-tab">
+          <div className="module-heading">
+            <div>
+              <p>Konfiguracja</p>
+              <h2>Inwestorzy</h2>
+            </div>
+            <div className="module-actions">
+              <Settings size={24} />
+            </div>
+          </div>
+
+          <form className="entry-form settings-form" onSubmit={saveSettings}>
+            <label>
+              <span>Pierwszy inwestor</span>
+              <input
+                value={settingsForm.primary}
+                onChange={(event) => setSettingsForm({ ...settingsForm, primary: event.target.value })}
+                placeholder="np. Paweł"
+              />
+            </label>
+            <label>
+              <span>Drugi inwestor</span>
+              <input
+                value={settingsForm.partner}
+                onChange={(event) => setSettingsForm({ ...settingsForm, partner: event.target.value })}
+                placeholder="np. Anna"
+              />
+            </label>
+            <div className="modal-actions">
+              <button type="submit" className="primary-action">
+                <Check size={18} />
+                Zapisz ustawienia
+              </button>
+            </div>
+          </form>
         </section>
         )}
       </section>
@@ -1102,15 +1188,15 @@ function App() {
                       setCostForm({ ...costForm, payer, investorShare })
                     }}
                   >
-                    <option value="me">Ja</option>
-                    <option value="partner">Drugi inwestor</option>
+                    <option value="me">{settings.investors.primary}</option>
+                    <option value="partner">{settings.investors.partner}</option>
                     <option value="half">Na pół</option>
                     <option value="custom">Inny podział</option>
                   </select>
                 </label>
                 {costForm.payer === 'custom' && (
                   <label>
-                    <span>Mój udział %</span>
+                    <span>Udział: {settings.investors.primary} %</span>
                     <input
                       type="number"
                       min="0"

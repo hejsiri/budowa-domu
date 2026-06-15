@@ -76,6 +76,12 @@ const initialState = {
       paidDate: '',
     },
   ],
+  settings: {
+    investors: {
+      primary: 'Ja',
+      partner: 'Drugi inwestor',
+    },
+  },
 }
 
 const storage = multer.diskStorage({
@@ -126,7 +132,8 @@ async function ensureStorage() {
 async function readState() {
   await ensureStorage()
   const content = await fs.readFile(dataFile, 'utf8')
-  return JSON.parse(content)
+  const state = JSON.parse(content)
+  return { ...state, settings: normalizeSettings(state.settings) }
 }
 
 async function writeState(state) {
@@ -136,6 +143,15 @@ async function writeState(state) {
 
 function cleanText(value, fallback = '') {
   return String(value || fallback).trim()
+}
+
+function normalizeSettings(settings = {}) {
+  return {
+    investors: {
+      primary: cleanText(settings.investors?.primary, 'Ja'),
+      partner: cleanText(settings.investors?.partner, 'Drugi inwestor'),
+    },
+  }
 }
 
 function getToday() {
@@ -443,6 +459,17 @@ app.use('/api', requireAuth)
 app.get('/api/state', async (_request, response, next) => {
   try {
     response.json(await readState())
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/settings', async (request, response, next) => {
+  try {
+    const state = await readState()
+    state.settings = normalizeSettings(request.body)
+    await writeState(state)
+    response.json(state)
   } catch (error) {
     next(error)
   }

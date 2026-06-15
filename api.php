@@ -82,6 +82,12 @@ $initialState = [
             'paidDate' => '',
         ],
     ],
+    'settings' => [
+        'investors' => [
+            'primary' => 'Ja',
+            'partner' => 'Drugi inwestor',
+        ],
+    ],
 ];
 
 function uuid(): string
@@ -248,7 +254,12 @@ function readState(string $dataFile): array
 {
     $content = file_get_contents($dataFile);
     $state = json_decode($content ?: '', true);
-    return is_array($state) ? $state : ['tasks' => [], 'costs' => []];
+    if (!is_array($state)) {
+        $state = ['tasks' => [], 'costs' => []];
+    }
+
+    $state['settings'] = normalizeSettings($state['settings'] ?? []);
+    return $state;
 }
 
 function writeState(string $dataFile, array $state)
@@ -260,6 +271,18 @@ function cleanText($value, string $fallback = ''): string
 {
     $text = trim((string)($value ?? $fallback));
     return $text !== '' ? $text : $fallback;
+}
+
+function normalizeSettings($settings): array
+{
+    $investors = is_array($settings['investors'] ?? null) ? $settings['investors'] : [];
+
+    return [
+        'investors' => [
+            'primary' => cleanText($investors['primary'] ?? '', 'Ja'),
+            'partner' => cleanText($investors['partner'] ?? '', 'Drugi inwestor'),
+        ],
+    ];
 }
 
 function cleanPayer($value): string
@@ -481,6 +504,13 @@ try {
 
     if (!currentUser($sessionsFile)) {
         respond(['message' => 'Sesja wygasla. Zaloguj sie ponownie.'], 401);
+    }
+
+    if ($resource === 'settings' && $method === 'POST') {
+        $body = readJsonBody();
+        $state['settings'] = normalizeSettings($body);
+        writeState($dataFile, $state);
+        respond($state);
     }
 
     if ($resource === 'file' && $method === 'GET') {

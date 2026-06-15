@@ -470,6 +470,10 @@ label span {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.settings-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -912,7 +916,7 @@ input:disabled {
 
   .section-tabs {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .section-tabs button {
