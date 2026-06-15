@@ -578,7 +578,6 @@ function App() {
     )
     if (saved) {
       resetTaskForm()
-      event.currentTarget.reset()
       closeModal()
     }
   }
@@ -657,7 +656,6 @@ function App() {
     )
     if (saved) {
       resetCostForm()
-      event.currentTarget.reset()
       closeModal()
     }
   }
