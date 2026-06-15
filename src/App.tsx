@@ -523,11 +523,21 @@ function App() {
   }
 
   function formatAmountInput(value: number) {
-    return Number.isFinite(value) && value > 0 ? String(Math.round(value)) : ''
+    return Number.isFinite(value) && value > 0 ? formatWithThousands(Math.round(value)) : ''
+  }
+
+  function parseAmountInput(value: string | number) {
+    const amount = Number(String(value).replace(/\s/g, ''))
+    return Number.isFinite(amount) ? amount : 0
+  }
+
+  function cleanAmountInput(value: string) {
+    const digits = value.replace(/\D/g, '')
+    return digits ? formatWithThousands(Number(digits)) : ''
   }
 
   function setCostPayer(payer: CostPayer) {
-    const amount = Number(costForm.amount)
+    const amount = parseAmountInput(costForm.amount)
     const halfAmount = Number.isFinite(amount) ? amount / 2 : 0
     const nextForm = { ...costForm, payer }
 
@@ -549,12 +559,13 @@ function App() {
   }
 
   function setCostAmount(amount: string) {
-    const numericAmount = Number(amount)
+    const formattedAmount = cleanAmountInput(amount)
+    const numericAmount = parseAmountInput(formattedAmount)
     const halfAmount = Number.isFinite(numericAmount) ? numericAmount / 2 : 0
 
     setCostForm((current) => ({
       ...current,
-      amount,
+      amount: formattedAmount,
       investorAmount:
         current.payer === 'partner'
           ? ''
@@ -562,7 +573,7 @@ function App() {
             ? formatAmountInput(halfAmount)
             : current.payer === 'custom'
               ? current.investorAmount
-              : amount,
+              : formattedAmount,
       partnerAmount:
         current.payer === 'me'
           ? ''
@@ -570,39 +581,41 @@ function App() {
             ? formatAmountInput(halfAmount)
             : current.payer === 'custom'
               ? current.partnerAmount
-              : amount,
+              : formattedAmount,
     }))
   }
 
   function setInvestorAmount(investorAmount: string) {
+    const formattedInvestorAmount = cleanAmountInput(investorAmount)
     setCostForm((current) => {
       if (current.payer === 'half') {
-        const amount = Number(investorAmount)
+        const amount = parseAmountInput(formattedInvestorAmount)
         return {
           ...current,
-          investorAmount,
-          partnerAmount: investorAmount,
+          investorAmount: formattedInvestorAmount,
+          partnerAmount: formattedInvestorAmount,
           amount: formatAmountInput(Number.isFinite(amount) ? amount * 2 : 0),
         }
       }
 
       if (current.payer === 'me') {
-        return { ...current, investorAmount, amount: investorAmount }
+        return { ...current, investorAmount: formattedInvestorAmount, amount: formattedInvestorAmount }
       }
 
-      const amount = Number(investorAmount) + Number(current.partnerAmount || 0)
-      return { ...current, investorAmount, amount: formatAmountInput(amount) }
+      const amount = parseAmountInput(formattedInvestorAmount) + parseAmountInput(current.partnerAmount || 0)
+      return { ...current, investorAmount: formattedInvestorAmount, amount: formatAmountInput(amount) }
     })
   }
 
   function setPartnerAmount(partnerAmount: string) {
+    const formattedPartnerAmount = cleanAmountInput(partnerAmount)
     setCostForm((current) => {
       if (current.payer === 'partner') {
-        return { ...current, partnerAmount, amount: partnerAmount }
+        return { ...current, partnerAmount: formattedPartnerAmount, amount: formattedPartnerAmount }
       }
 
-      const amount = Number(current.investorAmount || 0) + Number(partnerAmount)
-      return { ...current, partnerAmount, amount: formatAmountInput(amount) }
+      const amount = parseAmountInput(current.investorAmount || 0) + parseAmountInput(formattedPartnerAmount)
+      return { ...current, partnerAmount: formattedPartnerAmount, amount: formatAmountInput(amount) }
     })
   }
 
@@ -670,12 +683,12 @@ function App() {
 
   async function addCost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const amount = Number(costForm.amount)
+    const amount = parseAmountInput(costForm.amount)
     if (!costForm.title.trim() || !Number.isFinite(amount) || amount < 0) {
       return
     }
 
-    const investorAmount = costForm.payer === 'partner' ? 0 : Number(costForm.investorAmount || amount)
+    const investorAmount = costForm.payer === 'partner' ? 0 : parseAmountInput(costForm.investorAmount || amount)
     const investorShare =
       costForm.payer === 'me'
         ? 100
@@ -690,7 +703,7 @@ function App() {
     body.append('title', costForm.title)
     body.append('area', costForm.area)
     body.append('category', costForm.category)
-    body.append('amount', costForm.amount)
+    body.append('amount', String(amount))
     body.append('payer', costForm.payer)
     body.append('investorShare', String(investorShare))
     body.append('partnerShare', String(partnerShare))
@@ -1465,9 +1478,8 @@ function App() {
                 <label>
                   <span>Kwota PLN</span>
                   <input
-                    type="number"
-                    min="0"
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
                     value={costForm.amount}
                     onChange={(event) => setCostAmount(event.target.value)}
                     placeholder="0"
@@ -1526,9 +1538,8 @@ function App() {
                   <label>
                     <span>Ile płaci: {settings.investors.primary}</span>
                     <input
-                      type="number"
-                      min="0"
-                      step="1"
+                      type="text"
+                      inputMode="numeric"
                       value={costForm.investorAmount}
                       onChange={(event) => setInvestorAmount(event.target.value)}
                       placeholder="0"
@@ -1539,9 +1550,8 @@ function App() {
                   <label>
                     <span>Ile płaci: {settings.investors.partner}</span>
                     <input
-                      type="number"
-                      min="0"
-                      step="1"
+                      type="text"
+                      inputMode="numeric"
                       value={costForm.partnerAmount}
                       onChange={(event) => setPartnerAmount(event.target.value)}
                       placeholder="0"
