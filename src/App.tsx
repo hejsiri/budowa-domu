@@ -1073,7 +1073,7 @@ function App() {
 
         <section className="stats-grid" aria-label="Podsumowanie">
           <article className="stat-panel total">
-            <span>Budżet wpisany</span>
+            <span>Planowany koszt inwestycji</span>
             <strong>{formatCurrency(summary.total)}</strong>
             <small>Wszystkie wydatki z rejestru</small>
           </article>
