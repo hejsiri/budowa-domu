@@ -3,9 +3,11 @@ declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 
-$dataDir = __DIR__ . '/server/data';
+$dataDir = __DIR__ . '/storage';
 $uploadsDir = __DIR__ . '/uploads';
 $dataFile = $dataDir . '/budowa.json';
+$legacyDataFile = __DIR__ . '/server/data/budowa.json';
+$exampleDataFile = __DIR__ . '/server/data/budowa.example.json';
 
 $initialState = [
     'tasks' => [
@@ -71,7 +73,7 @@ function readJsonBody(): array
     return is_array($decoded) ? $decoded : [];
 }
 
-function ensureStorage(array $initialState, string $dataDir, string $uploadsDir, string $dataFile): void
+function ensureStorage(array $initialState, string $dataDir, string $uploadsDir, string $dataFile, string $legacyDataFile, string $exampleDataFile): void
 {
     if (!is_dir($dataDir)) {
         mkdir($dataDir, 0775, true);
@@ -80,6 +82,16 @@ function ensureStorage(array $initialState, string $dataDir, string $uploadsDir,
         mkdir($uploadsDir, 0775, true);
     }
     if (!is_file($dataFile)) {
+        if (is_file($legacyDataFile)) {
+            copy($legacyDataFile, $dataFile);
+            return;
+        }
+
+        if (is_file($exampleDataFile)) {
+            copy($exampleDataFile, $dataFile);
+            return;
+        }
+
         file_put_contents($dataFile, json_encode($initialState, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
 }
@@ -109,7 +121,7 @@ function respond(mixed $payload, int $status = 200): never
     exit;
 }
 
-ensureStorage($initialState, $dataDir, $uploadsDir, $dataFile);
+ensureStorage($initialState, $dataDir, $uploadsDir, $dataFile, $legacyDataFile, $exampleDataFile);
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $resource = $_GET['resource'] ?? 'state';

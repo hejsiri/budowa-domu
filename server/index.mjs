@@ -7,9 +7,11 @@ import multer from 'multer'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '..')
-const dataDir = path.join(__dirname, 'data')
+const storageDir = path.join(rootDir, 'storage')
 const uploadsDir = path.join(rootDir, 'uploads')
-const dataFile = path.join(dataDir, 'budowa.json')
+const dataFile = path.join(storageDir, 'budowa.json')
+const legacyDataFile = path.join(__dirname, 'data', 'budowa.json')
+const exampleDataFile = path.join(__dirname, 'data', 'budowa.example.json')
 const port = Number(process.env.PORT || 4174)
 
 const initialState = {
@@ -88,13 +90,21 @@ const upload = multer({
 })
 
 async function ensureStorage() {
-  await fs.mkdir(dataDir, { recursive: true })
+  await fs.mkdir(storageDir, { recursive: true })
   await fs.mkdir(uploadsDir, { recursive: true })
 
   try {
     await fs.access(dataFile)
   } catch {
-    await writeState(initialState)
+    try {
+      await fs.copyFile(legacyDataFile, dataFile)
+    } catch {
+      try {
+        await fs.copyFile(exampleDataFile, dataFile)
+      } catch {
+        await writeState(initialState)
+      }
+    }
   }
 }
 
@@ -105,7 +115,7 @@ async function readState() {
 }
 
 async function writeState(state) {
-  await fs.mkdir(dataDir, { recursive: true })
+  await fs.mkdir(storageDir, { recursive: true })
   await fs.writeFile(dataFile, JSON.stringify(state, null, 2))
 }
 

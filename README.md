@@ -1,4 +1,11 @@
-# React + TypeScript + Vite
+# Budowa domu
+
+Aplikacja zapisuje dane lokalnie w `storage/budowa.json`, a załączniki w `uploads/`.
+Te katalogi są ignorowane przez git, więc aktualizacja kodu z repozytorium nie nadpisze zadań, wydatków ani faktur.
+
+W repozytorium znajduje się tylko plik przykładowy `server/data/budowa.example.json`. Przy pierwszym uruchomieniu aplikacja tworzy z niego lokalną bazę, jeśli `storage/budowa.json` jeszcze nie istnieje.
+
+## Development
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
