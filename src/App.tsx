@@ -90,8 +90,8 @@ const emptyState: AppState = { tasks: [], costs: [], settings: defaultSettings }
 
 const numberParts = new Intl.NumberFormat('pl-PL', {
   useGrouping: false,
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
 })
 
 function formatWithThousands(value: number | string) {
@@ -406,8 +406,8 @@ function App() {
       amount: String(cost.amount),
       payer: cost.payer || 'me',
       investorShare: String(split.investorShare),
-      investorAmount: investorAmount ? String(Number(investorAmount.toFixed(2))) : '',
-      partnerAmount: partnerAmount ? String(Number(partnerAmount.toFixed(2))) : '',
+      investorAmount: investorAmount ? String(Math.round(investorAmount)) : '',
+      partnerAmount: partnerAmount ? String(Math.round(partnerAmount)) : '',
       status: cost.status,
       paidDate: cost.paidDate,
     })
@@ -471,7 +471,7 @@ function App() {
   }
 
   function formatAmountInput(value: number) {
-    return Number.isFinite(value) && value > 0 ? String(Number(value.toFixed(2))) : ''
+    return Number.isFinite(value) && value > 0 ? String(Math.round(value)) : ''
   }
 
   function setCostPayer(payer: CostPayer) {
@@ -1393,10 +1393,10 @@ function App() {
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
+                    step="1"
                     value={costForm.amount}
                     onChange={(event) => setCostAmount(event.target.value)}
-                    placeholder="0,00"
+                    placeholder="0"
                   />
                 </label>
                 <label>
@@ -1454,10 +1454,10 @@ function App() {
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="1"
                       value={costForm.investorAmount}
                       onChange={(event) => setInvestorAmount(event.target.value)}
-                      placeholder="0,00"
+                      placeholder="0"
                     />
                   </label>
                 )}
@@ -1467,10 +1467,10 @@ function App() {
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="1"
                       value={costForm.partnerAmount}
                       onChange={(event) => setPartnerAmount(event.target.value)}
-                      placeholder="0,00"
+                      placeholder="0"
                     />
                   </label>
                 )}
