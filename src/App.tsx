@@ -6,6 +6,10 @@ import {
   ClipboardList,
   FileText,
   Home,
+  KeyRound,
+  Lock,
+  LogOut,
+  Mail,
   Paperclip,
   Plus,
   SquarePen,
@@ -17,6 +21,13 @@ import './App.css'
 type TaskStatus = 'todo' | 'done'
 type PaymentStatus = 'unpaid' | 'paid'
 type ActiveSection = 'tasks' | 'costs'
+type AuthMode = 'login' | 'register' | 'verify'
+
+type AuthStatus = {
+  authenticated: boolean
+  setupRequired: boolean
+  email: string
+}
 
 type Task = {
   id: string
@@ -76,6 +87,10 @@ const isDevServer = import.meta.env.DEV
 
 function apiEndpoint(resource: string, id?: string, action?: string) {
   if (isDevServer) {
+    if (resource === 'auth') {
+      return action ? `/api/auth/${action}` : '/api/auth'
+    }
+
     const suffix = id ? `/${id}${action ? `/${action}` : ''}` : ''
     return `/api/${resource}${suffix}`
   }
@@ -96,7 +111,7 @@ function attachmentHref(path: string) {
 }
 
 async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options)
+  const response = await fetch(url, { credentials: 'same-origin', ...options })
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Nie udalo sie zapisac danych.' }))
@@ -107,6 +122,20 @@ async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 function App() {
+  const [auth, setAuth] = useState<AuthStatus>({
+    authenticated: false,
+    setupRequired: false,
+    email: '',
+  })
+  const [authMode, setAuthMode] = useState<AuthMode>('login')
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authMessage, setAuthMessage] = useState('')
+  const [authForm, setAuthForm] = useState({
+    email: '',
+    password: '',
+    passwordConfirm: '',
+    code: '',
+  })
   const [state, setState] = useState<AppState>(emptyState)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -145,10 +174,33 @@ function App() {
     }
   }
 
+  async function refreshAuth() {
+    setAuthLoading(true)
+    setError('')
+
+    try {
+      const status = await requestJson<AuthStatus>(apiEndpoint('auth'))
+      setAuth(status)
+      setAuthMode(status.setupRequired ? 'register' : 'login')
+      if (status.authenticated) {
+        await refreshState()
+      } else {
+        setState(emptyState)
+        setIsLoading(false)
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie sprawdzic logowania.')
+      setIsLoading(false)
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
   useEffect(() => {
-    // Initial server synchronization for the dashboard data.
+    // Initial authentication check before loading dashboard data.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    refreshState()
+    refreshAuth()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -333,6 +385,230 @@ function App() {
     runServerAction(() => requestJson<AppState>(apiEndpoint('costs', id), { method: 'DELETE' }))
   }
 
+  async function startRegistration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    setAuthMessage('')
+
+    try {
+      const result = await requestJson<{ message: string; developmentCode?: string }>(
+        apiEndpoint('auth', undefined, 'register-start'),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(authForm),
+        },
+      )
+      setAuthMessage(
+        result.developmentCode
+          ? `${result.message} Kod lokalny: ${result.developmentCode}`
+          : result.message,
+      )
+      setAuthMode('verify')
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie rozpoczac rejestracji.')
+    }
+  }
+
+  async function verifyRegistration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    setAuthMessage('')
+
+    try {
+      const result = await requestJson<{ message: string }>(
+        apiEndpoint('auth', undefined, 'register-verify'),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: authForm.code }),
+        },
+      )
+      setAuthMessage(result.message)
+      setAuth((current) => ({ ...current, setupRequired: false }))
+      setAuthMode('login')
+      setAuthForm((current) => ({ ...current, password: '', passwordConfirm: '', code: '' }))
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie potwierdzic kodu.')
+    }
+  }
+
+  async function login(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    setAuthMessage('')
+
+    try {
+      const result = await requestJson<AuthStatus>(apiEndpoint('auth', undefined, 'login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(authForm),
+      })
+      setAuth({ authenticated: true, setupRequired: false, email: result.email })
+      await refreshState()
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie zalogowac.')
+    }
+  }
+
+  async function logout() {
+    setError('')
+    await requestJson(apiEndpoint('auth', undefined, 'logout'), { method: 'POST' }).catch(() => undefined)
+    setAuth({ authenticated: false, setupRequired: false, email: '' })
+    setState(emptyState)
+    setAuthMode('login')
+  }
+
+  if (authLoading) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-card">
+          <span className="auth-mark">
+            <Home size={24} />
+          </span>
+          <p>Budowa domu</p>
+          <h1>Sprawdzam dostęp</h1>
+          <div className="auth-empty">Ładowanie...</div>
+        </section>
+      </main>
+    )
+  }
+
+  if (!auth.authenticated) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-card">
+          <span className="auth-mark">
+            {authMode === 'verify' ? <KeyRound size={24} /> : <Lock size={24} />}
+          </span>
+          <p>Panel inwestora</p>
+          <h1>
+            {authMode === 'register'
+              ? 'Utwórz pierwsze konto'
+              : authMode === 'verify'
+                ? 'Wpisz kod z emaila'
+                : 'Zaloguj się'}
+          </h1>
+
+          {error && <div className="notice auth-notice">{error}</div>}
+          {authMessage && <div className="auth-success">{authMessage}</div>}
+
+          {authMode === 'register' && (
+            <form className="auth-form" onSubmit={startRegistration}>
+              <label>
+                <span>Adres email</span>
+                <div className="auth-input">
+                  <Mail size={18} />
+                  <input
+                    type="email"
+                    value={authForm.email}
+                    onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })}
+                    autoComplete="email"
+                    autoFocus
+                    required
+                  />
+                </div>
+              </label>
+              <label>
+                <span>Hasło</span>
+                <div className="auth-input">
+                  <Lock size={18} />
+                  <input
+                    type="password"
+                    value={authForm.password}
+                    onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })}
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                </div>
+              </label>
+              <label>
+                <span>Powtórz hasło</span>
+                <div className="auth-input">
+                  <Lock size={18} />
+                  <input
+                    type="password"
+                    value={authForm.passwordConfirm}
+                    onChange={(event) =>
+                      setAuthForm({ ...authForm, passwordConfirm: event.target.value })
+                    }
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                </div>
+              </label>
+              <button className="primary-action auth-submit" type="submit">
+                <Mail size={18} />
+                Wyślij kod
+              </button>
+            </form>
+          )}
+
+          {authMode === 'verify' && (
+            <form className="auth-form" onSubmit={verifyRegistration}>
+              <label>
+                <span>Kod weryfikacyjny</span>
+                <div className="auth-input">
+                  <KeyRound size={18} />
+                  <input
+                    inputMode="numeric"
+                    value={authForm.code}
+                    onChange={(event) => setAuthForm({ ...authForm, code: event.target.value })}
+                    placeholder="000000"
+                    autoFocus
+                    required
+                  />
+                </div>
+              </label>
+              <button className="primary-action auth-submit" type="submit">
+                <Check size={18} />
+                Potwierdź konto
+              </button>
+            </form>
+          )}
+
+          {authMode === 'login' && (
+            <form className="auth-form" onSubmit={login}>
+              <label>
+                <span>Adres email</span>
+                <div className="auth-input">
+                  <Mail size={18} />
+                  <input
+                    type="email"
+                    value={authForm.email}
+                    onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })}
+                    autoComplete="email"
+                    autoFocus
+                    required
+                  />
+                </div>
+              </label>
+              <label>
+                <span>Hasło</span>
+                <div className="auth-input">
+                  <Lock size={18} />
+                  <input
+                    type="password"
+                    value={authForm.password}
+                    onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })}
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+              </label>
+              <button className="primary-action auth-submit" type="submit">
+                <Lock size={18} />
+                Zaloguj się
+              </button>
+            </form>
+          )}
+        </section>
+      </main>
+    )
+  }
+
   return (
     <main className="shell">
       {error && <div className="notice">{error}</div>}
@@ -344,6 +620,10 @@ function App() {
           </span>
           <p>Panel inwestora</p>
           <h1>Budowa domu</h1>
+          <button className="logout-button" onClick={logout}>
+            <LogOut size={16} />
+            Wyloguj
+          </button>
         </div>
 
         <section className="stats-grid" aria-label="Podsumowanie">

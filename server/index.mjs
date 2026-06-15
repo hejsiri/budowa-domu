@@ -1,7 +1,7 @@
 import express from 'express'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import multer from 'multer'
 
@@ -10,8 +10,11 @@ const rootDir = path.resolve(__dirname, '..')
 const storageDir = path.join(rootDir, 'storage')
 const uploadsDir = path.join(rootDir, 'uploads')
 const dataFile = path.join(storageDir, 'budowa.json')
+const usersFile = path.join(storageDir, 'users.json')
+const sessionsFile = path.join(storageDir, 'sessions.json')
 const legacyDataFile = path.join(__dirname, 'data', 'budowa.json')
 const exampleDataFile = path.join(__dirname, 'data', 'budowa.example.json')
+const sessionCookieName = 'budowa_session'
 const port = Number(process.env.PORT || 4174)
 
 const initialState = {
@@ -127,6 +130,128 @@ function getToday() {
   return new Date().toISOString().slice(0, 10)
 }
 
+async function readStorageFile(file, fallback) {
+  try {
+    return JSON.parse(await fs.readFile(file, 'utf8'))
+  } catch {
+    return fallback
+  }
+}
+
+async function writeStorageFile(file, payload) {
+  await fs.mkdir(path.dirname(file), { recursive: true })
+  await fs.writeFile(file, JSON.stringify(payload, null, 2))
+}
+
+async function getUsers() {
+  const store = await readStorageFile(usersFile, { users: [], pendingRegistration: null })
+  return {
+    users: Array.isArray(store.users) ? store.users : [],
+    pendingRegistration: store.pendingRegistration || null,
+  }
+}
+
+function cleanEmail(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function hashSecret(secret) {
+  const salt = randomBytes(16).toString('hex')
+  const hash = scryptSync(secret, salt, 64).toString('hex')
+  return `${salt}:${hash}`
+}
+
+function verifySecret(secret, storedHash) {
+  const [salt, hash] = String(storedHash || '').split(':')
+  if (!salt || !hash) {
+    return false
+  }
+
+  const stored = Buffer.from(hash, 'hex')
+  const current = scryptSync(secret, salt, 64)
+  return stored.length === current.length && timingSafeEqual(stored, current)
+}
+
+function generateCode() {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
+function parseCookies(cookieHeader = '') {
+  return Object.fromEntries(
+    cookieHeader
+      .split(';')
+      .map((entry) => entry.trim().split('='))
+      .filter(([key, value]) => key && value)
+      .map(([key, value]) => [key, decodeURIComponent(value)]),
+  )
+}
+
+function setSessionCookie(response, token, maxAgeSeconds) {
+  const parts = [
+    `${sessionCookieName}=${encodeURIComponent(token)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${maxAgeSeconds}`,
+  ]
+
+  response.setHeader('Set-Cookie', parts.join('; '))
+}
+
+async function createSession(response, email) {
+  const token = randomBytes(32).toString('hex')
+  const sessions = await readStorageFile(sessionsFile, { sessions: [] })
+  sessions.sessions = (sessions.sessions || []).filter((session) => Number(session.expiresAt) > Date.now())
+  sessions.sessions.push({
+    tokenHash: hashSecret(token),
+    email,
+    expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 14,
+  })
+
+  await writeStorageFile(sessionsFile, sessions)
+  setSessionCookie(response, token, 60 * 60 * 24 * 14)
+}
+
+async function getCurrentUser(request) {
+  const token = parseCookies(request.headers.cookie)[sessionCookieName]
+  if (!token) {
+    return null
+  }
+
+  const sessions = await readStorageFile(sessionsFile, { sessions: [] })
+  const session = (sessions.sessions || []).find(
+    (item) => Number(item.expiresAt) > Date.now() && verifySecret(token, item.tokenHash),
+  )
+
+  return session ? { email: session.email } : null
+}
+
+async function clearSession(request, response) {
+  const token = parseCookies(request.headers.cookie)[sessionCookieName]
+  if (token) {
+    const sessions = await readStorageFile(sessionsFile, { sessions: [] })
+    sessions.sessions = (sessions.sessions || []).filter((session) => !verifySecret(token, session.tokenHash))
+    await writeStorageFile(sessionsFile, sessions)
+  }
+
+  setSessionCookie(response, '', 0)
+}
+
+async function requireAuth(request, response, next) {
+  try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      response.status(401).json({ message: 'Sesja wygasla. Zaloguj sie ponownie.' })
+      return
+    }
+
+    request.user = user
+    next()
+  } catch (error) {
+    next(error)
+  }
+}
+
 const app = express()
 app.use(express.json())
 app.use('/uploads', express.static(uploadsDir))
@@ -134,6 +259,128 @@ app.use('/uploads', express.static(uploadsDir))
 app.get('/api/health', (_request, response) => {
   response.json({ ok: true })
 })
+
+app.get('/api/auth', async (request, response, next) => {
+  try {
+    const store = await getUsers()
+    const user = await getCurrentUser(request)
+    response.json({
+      authenticated: user !== null,
+      setupRequired: store.users.length === 0,
+      email: user?.email || '',
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/auth/register-start', async (request, response, next) => {
+  try {
+    const store = await getUsers()
+    if (store.users.length > 0) {
+      response.status(403).json({ message: 'Rejestracja jest juz zablokowana.' })
+      return
+    }
+
+    const email = cleanEmail(request.body.email)
+    const password = String(request.body.password || '')
+    const passwordConfirm = String(request.body.passwordConfirm || '')
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      response.status(400).json({ message: 'Podaj poprawny adres email.' })
+      return
+    }
+
+    if (password.length < 8 || password !== passwordConfirm) {
+      response.status(400).json({ message: 'Hasla musza byc takie same i miec minimum 8 znakow.' })
+      return
+    }
+
+    const code = generateCode()
+    store.pendingRegistration = {
+      email,
+      passwordHash: hashSecret(password),
+      codeHash: hashSecret(code),
+      expiresAt: Date.now() + 1000 * 60 * 5,
+    }
+    await writeStorageFile(usersFile, store)
+
+    console.log(`Kod weryfikacyjny Budowa domu dla ${email}: ${code}`)
+    response.json({
+      message: 'Wyslano kod weryfikacyjny.',
+      developmentCode: process.env.NODE_ENV === 'production' ? undefined : code,
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/auth/register-verify', async (request, response, next) => {
+  try {
+    const store = await getUsers()
+    if (store.users.length > 0) {
+      response.status(403).json({ message: 'Rejestracja jest juz zablokowana.' })
+      return
+    }
+
+    const pending = store.pendingRegistration
+    const code = String(request.body.code || '').trim()
+
+    if (!pending || Number(pending.expiresAt) < Date.now()) {
+      response.status(400).json({ message: 'Kod wygasl. Wyslij formularz rejestracji ponownie.' })
+      return
+    }
+
+    if (!verifySecret(code, pending.codeHash)) {
+      response.status(400).json({ message: 'Niepoprawny kod weryfikacyjny.' })
+      return
+    }
+
+    store.users = [
+      {
+        id: randomUUID(),
+        email: pending.email,
+        passwordHash: pending.passwordHash,
+        createdAt: new Date().toISOString(),
+      },
+    ]
+    store.pendingRegistration = null
+    await writeStorageFile(usersFile, store)
+    response.json({ message: 'Konto zostalo utworzone. Mozesz sie zalogowac.' })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/auth/login', async (request, response, next) => {
+  try {
+    const store = await getUsers()
+    const email = cleanEmail(request.body.email)
+    const password = String(request.body.password || '')
+    const user = store.users.find((item) => item.email === email)
+
+    if (!user || !verifySecret(password, user.passwordHash)) {
+      response.status(401).json({ message: 'Niepoprawny email lub haslo.' })
+      return
+    }
+
+    await createSession(response, email)
+    response.json({ authenticated: true, email })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/auth/logout', async (request, response, next) => {
+  try {
+    await clearSession(request, response)
+    response.json({ authenticated: false })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.use('/api', requireAuth)
 
 app.get('/api/state', async (_request, response, next) => {
   try {

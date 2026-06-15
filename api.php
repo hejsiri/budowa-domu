@@ -6,8 +6,11 @@ header('Content-Type: application/json; charset=utf-8');
 $dataDir = __DIR__ . '/storage';
 $uploadsDir = __DIR__ . '/uploads';
 $dataFile = $dataDir . '/budowa.json';
+$usersFile = $dataDir . '/users.json';
+$sessionsFile = $dataDir . '/sessions.json';
 $legacyDataFile = __DIR__ . '/server/data/budowa.json';
 $exampleDataFile = __DIR__ . '/server/data/budowa.example.json';
+$sessionCookieName = 'budowa_session';
 
 $initialState = [
     'tasks' => [
@@ -64,6 +67,124 @@ function uuid(): string
     $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
     $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+}
+
+function readStorageFile(string $file, array $fallback): array
+{
+    if (!is_file($file)) {
+        return $fallback;
+    }
+
+    $decoded = json_decode(file_get_contents($file) ?: '', true);
+    return is_array($decoded) ? $decoded : $fallback;
+}
+
+function writeStorageFile(string $file, array $payload): void
+{
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0775, true);
+    }
+
+    file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+}
+
+function getUsers(string $usersFile): array
+{
+    $store = readStorageFile($usersFile, ['users' => [], 'pendingRegistration' => null]);
+    $store['users'] = is_array($store['users'] ?? null) ? $store['users'] : [];
+    return $store;
+}
+
+function userCount(string $usersFile): int
+{
+    return count(getUsers($usersFile)['users']);
+}
+
+function cleanEmail(mixed $value): string
+{
+    return strtolower(trim((string)($value ?? '')));
+}
+
+function generateCode(): string
+{
+    return (string)random_int(100000, 999999);
+}
+
+function sendVerificationEmail(string $email, string $code): bool
+{
+    $subject = 'Kod weryfikacyjny Budowa domu';
+    $message = "Twoj kod weryfikacyjny to: {$code}\n\nKod jest wazny 5 minut.";
+    $headers = [
+        'Content-Type: text/plain; charset=UTF-8',
+        'From: Budowa domu <no-reply@macbook.host>',
+    ];
+
+    return mail($email, $subject, $message, implode("\r\n", $headers));
+}
+
+function cookieOptions(int $expires): array
+{
+    return [
+        'expires' => $expires,
+        'path' => '/',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ];
+}
+
+function createSession(string $sessionsFile, string $email): void
+{
+    $token = bin2hex(random_bytes(32));
+    $sessions = readStorageFile($sessionsFile, ['sessions' => []]);
+    $sessions['sessions'] = array_values(array_filter(
+        $sessions['sessions'] ?? [],
+        static fn(array $session): bool => (int)($session['expiresAt'] ?? 0) > time()
+    ));
+    $sessions['sessions'][] = [
+        'tokenHash' => hash('sha256', $token),
+        'email' => $email,
+        'expiresAt' => time() + 60 * 60 * 24 * 14,
+    ];
+
+    writeStorageFile($sessionsFile, $sessions);
+    setcookie('budowa_session', $token, cookieOptions(time() + 60 * 60 * 24 * 14));
+}
+
+function currentUser(string $sessionsFile): ?array
+{
+    $token = (string)($_COOKIE['budowa_session'] ?? '');
+    if ($token === '') {
+        return null;
+    }
+
+    $sessions = readStorageFile($sessionsFile, ['sessions' => []]);
+    $tokenHash = hash('sha256', $token);
+
+    foreach ($sessions['sessions'] ?? [] as $session) {
+        if ((int)($session['expiresAt'] ?? 0) > time() && hash_equals((string)($session['tokenHash'] ?? ''), $tokenHash)) {
+            return ['email' => (string)($session['email'] ?? '')];
+        }
+    }
+
+    return null;
+}
+
+function clearSession(string $sessionsFile): void
+{
+    $token = (string)($_COOKIE['budowa_session'] ?? '');
+    if ($token !== '') {
+        $tokenHash = hash('sha256', $token);
+        $sessions = readStorageFile($sessionsFile, ['sessions' => []]);
+        $sessions['sessions'] = array_values(array_filter(
+            $sessions['sessions'] ?? [],
+            static fn(array $session): bool => !hash_equals((string)($session['tokenHash'] ?? ''), $tokenHash)
+        ));
+        writeStorageFile($sessionsFile, $sessions);
+    }
+
+    setcookie('budowa_session', '', cookieOptions(time() - 3600));
 }
 
 function readJsonBody(): array
@@ -131,7 +252,108 @@ $state = readState($dataFile);
 
 try {
     if ($resource === 'state' && $method === 'GET') {
+        if (!currentUser($sessionsFile)) {
+            respond(['message' => 'Zaloguj sie, aby zobaczyc panel.'], 401);
+        }
         respond($state);
+    }
+
+    if ($resource === 'auth' && $method === 'GET') {
+        $user = currentUser($sessionsFile);
+        respond([
+            'authenticated' => $user !== null,
+            'setupRequired' => userCount($usersFile) === 0,
+            'email' => $user['email'] ?? '',
+        ]);
+    }
+
+    if ($resource === 'auth' && $method === 'POST' && $action === 'register-start') {
+        if (userCount($usersFile) > 0) {
+            respond(['message' => 'Rejestracja jest juz zablokowana.'], 403);
+        }
+
+        $body = readJsonBody();
+        $email = cleanEmail($body['email'] ?? '');
+        $password = (string)($body['password'] ?? '');
+        $passwordConfirm = (string)($body['passwordConfirm'] ?? '');
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            respond(['message' => 'Podaj poprawny adres email.'], 400);
+        }
+
+        if (strlen($password) < 8 || $password !== $passwordConfirm) {
+            respond(['message' => 'Hasla musza byc takie same i miec minimum 8 znakow.'], 400);
+        }
+
+        $code = generateCode();
+        $store = getUsers($usersFile);
+        $store['pendingRegistration'] = [
+            'email' => $email,
+            'passwordHash' => password_hash($password, PASSWORD_DEFAULT),
+            'codeHash' => password_hash($code, PASSWORD_DEFAULT),
+            'expiresAt' => time() + 60 * 5,
+        ];
+        writeStorageFile($usersFile, $store);
+
+        if (!sendVerificationEmail($email, $code)) {
+            respond(['message' => 'Nie udalo sie wyslac kodu email. Sprawdz konfiguracje poczty na hostingu.'], 500);
+        }
+
+        respond(['message' => 'Wyslano kod weryfikacyjny.']);
+    }
+
+    if ($resource === 'auth' && $method === 'POST' && $action === 'register-verify') {
+        if (userCount($usersFile) > 0) {
+            respond(['message' => 'Rejestracja jest juz zablokowana.'], 403);
+        }
+
+        $body = readJsonBody();
+        $code = trim((string)($body['code'] ?? ''));
+        $store = getUsers($usersFile);
+        $pending = $store['pendingRegistration'] ?? null;
+
+        if (!is_array($pending) || (int)($pending['expiresAt'] ?? 0) < time()) {
+            respond(['message' => 'Kod wygasl. Wyslij formularz rejestracji ponownie.'], 400);
+        }
+
+        if (!password_verify($code, (string)($pending['codeHash'] ?? ''))) {
+            respond(['message' => 'Niepoprawny kod weryfikacyjny.'], 400);
+        }
+
+        $store['users'] = [[
+            'id' => uuid(),
+            'email' => (string)$pending['email'],
+            'passwordHash' => (string)$pending['passwordHash'],
+            'createdAt' => date(DATE_ATOM),
+        ]];
+        $store['pendingRegistration'] = null;
+        writeStorageFile($usersFile, $store);
+        respond(['message' => 'Konto zostalo utworzone. Mozesz sie zalogowac.']);
+    }
+
+    if ($resource === 'auth' && $method === 'POST' && $action === 'login') {
+        $body = readJsonBody();
+        $email = cleanEmail($body['email'] ?? '');
+        $password = (string)($body['password'] ?? '');
+        $store = getUsers($usersFile);
+
+        foreach ($store['users'] as $user) {
+            if (($user['email'] ?? '') === $email && password_verify($password, (string)($user['passwordHash'] ?? ''))) {
+                createSession($sessionsFile, $email);
+                respond(['authenticated' => true, 'email' => $email]);
+            }
+        }
+
+        respond(['message' => 'Niepoprawny email lub haslo.'], 401);
+    }
+
+    if ($resource === 'auth' && $method === 'POST' && $action === 'logout') {
+        clearSession($sessionsFile);
+        respond(['authenticated' => false]);
+    }
+
+    if (!currentUser($sessionsFile)) {
+        respond(['message' => 'Sesja wygasla. Zaloguj sie ponownie.'], 401);
     }
 
     if ($resource === 'tasks' && $method === 'POST') {
