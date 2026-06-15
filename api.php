@@ -22,6 +22,7 @@ $sessionsFile = $dataDir . '/sessions.json';
 $legacyDataFile = __DIR__ . '/server/data/budowa.json';
 $exampleDataFile = __DIR__ . '/server/data/budowa.example.json';
 $sessionCookieName = 'budowa_session';
+$richTextLimit = 50000;
 
 $initialState = [
     'tasks' => [
@@ -287,7 +288,8 @@ function cleanText($value, string $fallback = ''): string
 
 function cleanRichText($value): string
 {
-    $html = substr((string)($value ?? ''), 0, 5000);
+    global $richTextLimit;
+    $html = substr((string)($value ?? ''), 0, $richTextLimit);
     $html = preg_replace('/<\s*(script|style)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html) ?? '';
     $html = strip_tags($html, '<b><strong><i><em><u><br><p><ul><ol><li>');
     $html = preg_replace('/<([a-z][a-z0-9]*)\b[^>]*>/i', '<$1>', $html) ?? '';

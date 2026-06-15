@@ -16,6 +16,7 @@ const legacyDataFile = path.join(__dirname, 'data', 'budowa.json')
 const exampleDataFile = path.join(__dirname, 'data', 'budowa.example.json')
 const sessionCookieName = 'budowa_session'
 const port = Number(process.env.PORT || 4174)
+const richTextLimit = 50000
 
 const initialState = {
   tasks: [
@@ -165,7 +166,7 @@ function cleanText(value, fallback = '') {
 
 function cleanRichText(value) {
   return String(value || '')
-    .slice(0, 5000)
+    .slice(0, richTextLimit)
     .replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
     .replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (match, tag) => {
       const cleanTag = String(tag).toLowerCase()

@@ -160,6 +160,7 @@ function costSplit(cost: Pick<Cost, 'payer' | 'investorShare' | 'partnerShare'>,
 
 const today = new Date().toISOString().slice(0, 10)
 const isDevServer = import.meta.env.DEV
+const richTextLimit = 50000
 
 function apiEndpoint(resource: string, id?: string, action?: string) {
   if (isDevServer) {
@@ -208,7 +209,7 @@ function taskPriority(priority: string) {
 
 function sanitizeRichTextHtml(html: string) {
   const template = document.createElement('template')
-  template.innerHTML = html.slice(0, 5000)
+  template.innerHTML = html.slice(0, richTextLimit)
   const allowedTags = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'P', 'DIV', 'UL', 'OL', 'LI'])
 
   function cleanNode(node: Node): Node {
