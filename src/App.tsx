@@ -524,17 +524,15 @@ function App() {
 
   const summary = useMemo(() => {
     const paidCosts = state.costs.filter((cost) => cost.status === 'paid')
-    const paid = state.costs
-      .filter((cost) => cost.status === 'paid')
-      .reduce((sum, cost) => sum + cost.amount, 0)
-    const unpaid = state.costs
-      .filter((cost) => cost.status === 'unpaid')
-      .reduce((sum, cost) => sum + cost.amount, 0)
+    const unpaidCosts = state.costs.filter((cost) => cost.status === 'unpaid')
+    const paid = paidCosts.reduce((sum, cost) => sum + cost.amount, 0)
+    const unpaid = unpaidCosts.reduce((sum, cost) => sum + cost.amount, 0)
 
     return {
       total: paid + unpaid,
       paid,
       unpaid,
+      unpaidCostCount: unpaidCosts.length,
       paidInvestor: paidCosts.reduce((sum, cost) => {
         return sum + (cost.amount * costSplit(cost, settings).investorShare) / 100
       }, 0),
@@ -1068,7 +1066,7 @@ function App() {
             <span>Do zapłaty</span>
             <strong>{formatCurrency(summary.unpaid)}</strong>
             <small>
-              {formatInteger(state.costs.filter((cost) => cost.status === 'unpaid').length)} pozycji
+              {formatInteger(summary.unpaidCostCount)} pozycji
             </small>
           </article>
           <article className="stat-panel paid-summary">
@@ -1118,6 +1116,7 @@ function App() {
           >
             <ClipboardList size={18} />
             Zadania
+            {summary.todoTasks > 0 && <span className="tab-count">{formatInteger(summary.todoTasks)}</span>}
           </button>
           <button
             className={activeSection === 'costs' ? 'active' : ''}
@@ -1129,6 +1128,7 @@ function App() {
           >
             <BanknoteArrowDown size={18} />
             Wydatki
+            {summary.unpaidCostCount > 0 && <span className="tab-count">{formatInteger(summary.unpaidCostCount)}</span>}
           </button>
         </nav>
       </header>
