@@ -82,6 +82,11 @@ type AppState = {
   settings?: SettingsState
 }
 
+type NotePreview = {
+  title: string
+  commentHtml: string
+}
+
 const defaultSettings: SettingsState = {
   investors: {
     primary: 'Ja',
@@ -244,6 +249,16 @@ function taskPriorityClass(priority: string) {
   return taskPriority(priority) === 'Pilne' ? ' priority-pilne' : ''
 }
 
+function plainTextToHtml(text: string) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .replace(/\n/g, '<br>')
+}
+
 function sanitizeRichTextHtml(html: string) {
   const template = document.createElement('template')
   template.innerHTML = html.slice(0, richTextLimit)
@@ -317,7 +332,7 @@ function App() {
   })
   const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null)
-  const [costNotePreview, setCostNotePreview] = useState<Pick<Cost, 'title' | 'commentHtml'> | null>(null)
+  const [notePreview, setNotePreview] = useState<NotePreview | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<File | undefined>()
@@ -412,7 +427,7 @@ function App() {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setAttachmentPreview(null)
-        setCostNotePreview(null)
+        setNotePreview(null)
         setActiveModal(null)
         setEditingTaskId(null)
         setEditingCostId(null)
@@ -464,7 +479,7 @@ function App() {
   }
 
   function closeCostNotePreview() {
-    setCostNotePreview(null)
+    setNotePreview(null)
   }
 
   function openNewTaskModal() {
@@ -1182,7 +1197,6 @@ function App() {
                   <p>
                     {task.area} · termin {formatTaskDateTime(task)}
                   </p>
-                  {task.comment && <p className="item-comment">{task.comment}</p>}
                   {task.attachments && task.attachments.length > 0 && (
                     <div className="attachment-list">
                       {task.attachments.map((attachment) => (
@@ -1212,6 +1226,15 @@ function App() {
                   )}
                 </div>
                 <div className="item-actions">
+                  {task.comment && (
+                    <button
+                      className="icon-button note-button"
+                      onClick={() => setNotePreview({ title: task.title, commentHtml: plainTextToHtml(task.comment || '') })}
+                      title="Pokaż komentarz"
+                    >
+                      <StickyNote size={17} />
+                    </button>
+                  )}
                   <button
                     className="icon-button edit-button"
                     onClick={() => openEditTaskModal(task)}
@@ -1291,7 +1314,7 @@ function App() {
                   {cost.commentHtml && (
                     <button
                       className="icon-button note-button"
-                      onClick={() => setCostNotePreview({ title: cost.title, commentHtml: cost.commentHtml })}
+                      onClick={() => setNotePreview({ title: cost.title, commentHtml: cost.commentHtml || '' })}
                       title="Pokaż notatkę"
                     >
                       <StickyNote size={17} />
@@ -1707,7 +1730,7 @@ function App() {
         </div>
       )}
 
-      {costNotePreview && (
+      {notePreview && (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeCostNotePreview}>
           <section
             className="modal-panel note-preview-panel"
@@ -1719,7 +1742,7 @@ function App() {
             <div className="modal-head">
               <div>
                 <p>Notatka</p>
-                <h2 id="note-preview-title">{costNotePreview.title}</h2>
+                <h2 id="note-preview-title">{notePreview.title}</h2>
               </div>
               <button className="modal-close" onClick={closeCostNotePreview} title="Zamknij">
                 <X size={20} />
@@ -1728,7 +1751,7 @@ function App() {
 
             <div
               className="note-preview-body rich-comment"
-              dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(costNotePreview.commentHtml || '') }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(notePreview.commentHtml || '') }}
             />
           </section>
         </div>
