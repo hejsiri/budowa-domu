@@ -158,6 +158,25 @@ function costSplit(cost: Pick<Cost, 'payer' | 'investorShare' | 'partnerShare'>,
   return { label: `Płaci ${primaryName}`, investorShare: 100, partnerShare: 0 }
 }
 
+function costSplitLabel(cost: Cost, settings = defaultSettings) {
+  const split = costSplit(cost, settings)
+  const primaryName = settings.investors.primary || defaultSettings.investors.primary
+  const partnerName = settings.investors.partner || defaultSettings.investors.partner
+  const primaryAmount = (cost.amount * split.investorShare) / 100
+  const partnerAmount = (cost.amount * split.partnerShare) / 100
+  const prefix = cost.status === 'paid' ? 'Zapłacił' : 'Płaci'
+
+  if (split.investorShare === 100 && split.partnerShare === 0) {
+    return `${prefix} ${primaryName}: ${formatCurrency(primaryAmount)}`
+  }
+
+  if (split.partnerShare === 100 && split.investorShare === 0) {
+    return `${prefix} ${partnerName}: ${formatCurrency(partnerAmount)}`
+  }
+
+  return `${split.label}: ${primaryName} ${formatCurrency(primaryAmount)}, ${partnerName} ${formatCurrency(partnerAmount)}`
+}
+
 const today = new Date().toISOString().slice(0, 10)
 const isDevServer = import.meta.env.DEV
 const richTextLimit = 50000
@@ -1221,10 +1240,7 @@ function App() {
                       : 'do zaplaty'}
                   </p>
                   <p className="cost-split">
-                    {costSplit(cost, settings).label}: {settings.investors.primary}{' '}
-                    {formatCurrency((cost.amount * costSplit(cost, settings).investorShare) / 100)}
-                    , {settings.investors.partner}{' '}
-                    {formatCurrency((cost.amount * costSplit(cost, settings).partnerShare) / 100)}
+                    {costSplitLabel(cost, settings)}
                   </p>
                 </div>
                 <div className="item-actions">
