@@ -79,6 +79,8 @@ type SettingsState = {
   investors: {
     primary: string
     partner: string
+    primaryEmail?: string
+    partnerEmail?: string
   }
   calendarToken?: string
 }
@@ -98,6 +100,8 @@ const defaultSettings: SettingsState = {
   investors: {
     primary: 'Ja',
     partner: 'Drugi inwestor',
+    primaryEmail: '',
+    partnerEmail: '',
   },
   calendarToken: '',
 }
@@ -379,6 +383,11 @@ function App() {
     paidDate: '',
   })
   const [settingsForm, setSettingsForm] = useState(defaultSettings.investors)
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    newPasswordConfirm: '',
+  })
 
   const settings = state.settings || defaultSettings
   const calendarUrl = calendarHref(settings.calendarToken)
@@ -564,6 +573,7 @@ function App() {
 
   function openSettingsModal() {
     setSettingsForm(settings.investors)
+    setPasswordForm({ currentPassword: '', newPassword: '', newPasswordConfirm: '' })
     setActiveModal('settings')
   }
 
@@ -851,13 +861,39 @@ function App() {
     setError('')
 
     try {
+      const wantsPasswordChange = Object.values(passwordForm).some((value) => value.trim() !== '')
+
+      if (wantsPasswordChange) {
+        if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.newPasswordConfirm) {
+          throw new Error('Wypełnij wszystkie pola zmiany hasła albo zostaw je puste.')
+        }
+
+        if (passwordForm.newPassword.length < 8) {
+          throw new Error('Nowe hasło musi mieć minimum 8 znaków.')
+        }
+
+        if (passwordForm.newPassword !== passwordForm.newPasswordConfirm) {
+          throw new Error('Nowe hasła nie są takie same.')
+        }
+      }
+
+      if (wantsPasswordChange) {
+        await requestJson(apiEndpoint('auth', undefined, 'change-password'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(passwordForm),
+        })
+      }
+
       const nextState = await requestJson<AppState>(apiEndpoint('settings'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ investors: settingsForm }),
       })
+
       setState({ ...nextState, settings: nextState.settings || defaultSettings })
       setSettingsForm((nextState.settings || defaultSettings).investors)
+      setPasswordForm({ currentPassword: '', newPassword: '', newPasswordConfirm: '' })
       closeModal()
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie zapisac ustawien.')
@@ -1439,11 +1475,31 @@ function App() {
                   />
                 </label>
                 <label>
+                  <span>Email pierwszego inwestora</span>
+                  <input
+                    type="email"
+                    value={settingsForm.primaryEmail || ''}
+                    onChange={(event) => setSettingsForm({ ...settingsForm, primaryEmail: event.target.value })}
+                    placeholder="np. pawel@example.com"
+                    autoComplete="email"
+                  />
+                </label>
+                <label>
                   <span>Drugi inwestor</span>
                   <input
                     value={settingsForm.partner}
                     onChange={(event) => setSettingsForm({ ...settingsForm, partner: event.target.value })}
                     placeholder="np. Anna"
+                  />
+                </label>
+                <label>
+                  <span>Email drugiego inwestora</span>
+                  <input
+                    type="email"
+                    value={settingsForm.partnerEmail || ''}
+                    onChange={(event) => setSettingsForm({ ...settingsForm, partnerEmail: event.target.value })}
+                    placeholder="np. anna@example.com"
+                    autoComplete="email"
                   />
                 </label>
                 {calendarUrl && (
@@ -1452,6 +1508,38 @@ function App() {
                     <input value={calendarUrl} readOnly onFocus={(event) => event.currentTarget.select()} />
                   </label>
                 )}
+                <div className="settings-section wide">
+                  <p>Nowe hasło</p>
+                </div>
+                <label>
+                  <span>Aktualne hasło</span>
+                  <input
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(event) => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })}
+                    autoComplete="current-password"
+                  />
+                </label>
+                <label>
+                  <span>Nowe hasło</span>
+                  <input
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(event) => setPasswordForm({ ...passwordForm, newPassword: event.target.value })}
+                    autoComplete="new-password"
+                    minLength={8}
+                  />
+                </label>
+                <label className="wide">
+                  <span>Powtórz nowe hasło</span>
+                  <input
+                    type="password"
+                    value={passwordForm.newPasswordConfirm}
+                    onChange={(event) => setPasswordForm({ ...passwordForm, newPasswordConfirm: event.target.value })}
+                    autoComplete="new-password"
+                    minLength={8}
+                  />
+                </label>
                 <div className="modal-actions">
                   <button type="button" className="secondary-action" onClick={closeModal}>
                     Anuluj

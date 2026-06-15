@@ -246,7 +246,9 @@
   "settings": {
     "investors": {
       "primary": "Ja",
-      "partner": "Drugi inwestor"
+      "partner": "Drugi inwestor",
+      "primaryEmail": "",
+      "partnerEmail": ""
     },
     "calendarToken": "example-calendar-token"
   }

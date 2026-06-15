@@ -93,6 +93,8 @@ $initialState = [
         'investors' => [
             'primary' => 'Ja',
             'partner' => 'Drugi inwestor',
+            'primaryEmail' => '',
+            'partnerEmail' => '',
         ],
         'calendarToken' => uuid(),
     ],
@@ -305,6 +307,8 @@ function normalizeSettings($settings): array
         'investors' => [
             'primary' => cleanText($investors['primary'] ?? '', 'Ja'),
             'partner' => cleanText($investors['partner'] ?? '', 'Drugi inwestor'),
+            'primaryEmail' => cleanEmail($investors['primaryEmail'] ?? ''),
+            'partnerEmail' => cleanEmail($investors['partnerEmail'] ?? ''),
         ],
         'calendarToken' => $calendarToken !== '' ? $calendarToken : uuid(),
     ];
@@ -636,6 +640,42 @@ try {
 
     if (!currentUser($sessionsFile)) {
         respond(['message' => 'Sesja wygasla. Zaloguj sie ponownie.'], 401);
+    }
+
+    if ($resource === 'auth' && $method === 'POST' && $action === 'change-password') {
+        $current = currentUser($sessionsFile);
+        $body = readJsonBody();
+        $currentPassword = (string)($body['currentPassword'] ?? '');
+        $newPassword = (string)($body['newPassword'] ?? '');
+        $newPasswordConfirm = (string)($body['newPasswordConfirm'] ?? '');
+
+        if (strlen($newPassword) < 8 || $newPassword !== $newPasswordConfirm) {
+            respond(['message' => 'Nowe hasla musza byc takie same i miec minimum 8 znakow.'], 400);
+        }
+
+        $store = getUsers($usersFile);
+        $updated = false;
+
+        foreach ($store['users'] as &$user) {
+            if (($user['email'] ?? '') === ($current['email'] ?? '')) {
+                if (!password_verify($currentPassword, (string)($user['passwordHash'] ?? ''))) {
+                    respond(['message' => 'Aktualne haslo jest niepoprawne.'], 401);
+                }
+
+                $user['passwordHash'] = password_hash($newPassword, PASSWORD_DEFAULT);
+                $user['updatedAt'] = date(DATE_ATOM);
+                $updated = true;
+                break;
+            }
+        }
+        unset($user);
+
+        if (!$updated) {
+            respond(['message' => 'Nie znaleziono konta uzytkownika.'], 404);
+        }
+
+        writeStorageFile($usersFile, $store);
+        respond(['message' => 'Haslo zostalo zmienione.']);
     }
 
     if ($resource === 'settings' && $method === 'POST') {

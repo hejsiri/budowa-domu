@@ -87,6 +87,8 @@ const initialState = {
     investors: {
       primary: 'Ja',
       partner: 'Drugi inwestor',
+      primaryEmail: '',
+      partnerEmail: '',
     },
     calendarToken: randomUUID(),
   },
@@ -182,6 +184,8 @@ function normalizeSettings(settings = {}) {
     investors: {
       primary: cleanText(settings.investors?.primary, 'Ja'),
       partner: cleanText(settings.investors?.partner, 'Drugi inwestor'),
+      primaryEmail: cleanEmail(settings.investors?.primaryEmail),
+      partnerEmail: cleanEmail(settings.investors?.partnerEmail),
     },
     calendarToken: cleanText(settings.calendarToken, randomUUID()),
   }
@@ -596,6 +600,40 @@ app.get('/api/calendar', async (request, response, next) => {
 })
 
 app.use('/api', requireAuth)
+
+app.post('/api/auth/change-password', async (request, response, next) => {
+  try {
+    const current = await currentUser(request)
+    const currentPassword = String(request.body.currentPassword || '')
+    const newPassword = String(request.body.newPassword || '')
+    const newPasswordConfirm = String(request.body.newPasswordConfirm || '')
+
+    if (newPassword.length < 8 || newPassword !== newPasswordConfirm) {
+      response.status(400).json({ message: 'Nowe hasla musza byc takie same i miec minimum 8 znakow.' })
+      return
+    }
+
+    const store = await getUsers()
+    const user = store.users.find((item) => item.email === current.email)
+
+    if (!user) {
+      response.status(404).json({ message: 'Nie znaleziono konta uzytkownika.' })
+      return
+    }
+
+    if (!verifySecret(currentPassword, user.passwordHash)) {
+      response.status(401).json({ message: 'Aktualne haslo jest niepoprawne.' })
+      return
+    }
+
+    user.passwordHash = hashSecret(newPassword)
+    user.updatedAt = new Date().toISOString()
+    await writeStorageFile(usersFile, store)
+    response.json({ message: 'Haslo zostalo zmienione.' })
+  } catch (error) {
+    next(error)
+  }
+})
 
 app.get('/api/state', async (_request, response, next) => {
   try {
