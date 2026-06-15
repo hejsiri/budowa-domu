@@ -1290,22 +1290,24 @@ function App() {
                     onChange={(event) => setTaskForm({ ...taskForm, dueDate: event.target.value })}
                   />
                 </label>
-                <label>
-                  <span>Początek</span>
-                  <input
-                    type="time"
-                    value={taskForm.startTime}
-                    onChange={(event) => setTaskForm({ ...taskForm, startTime: event.target.value })}
-                  />
-                </label>
-                <label>
-                  <span>Koniec</span>
-                  <input
-                    type="time"
-                    value={taskForm.endTime}
-                    onChange={(event) => setTaskForm({ ...taskForm, endTime: event.target.value })}
-                  />
-                </label>
+                <div className="time-fields">
+                  <label>
+                    <span>Początek</span>
+                    <input
+                      type="time"
+                      value={taskForm.startTime}
+                      onChange={(event) => setTaskForm({ ...taskForm, startTime: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    <span>Koniec</span>
+                    <input
+                      type="time"
+                      value={taskForm.endTime}
+                      onChange={(event) => setTaskForm({ ...taskForm, endTime: event.target.value })}
+                    />
+                  </label>
+                </div>
                 <label className="wide">
                   <span>Komentarz</span>
                   <textarea
