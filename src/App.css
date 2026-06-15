@@ -1216,7 +1216,7 @@ input:disabled {
 
 @media (max-width: 760px) {
   .page-hero {
-    padding: 72px 12px 22px;
+    padding: 72px 12px 0;
   }
 
   .hero-actions {
