@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   Home,
+  Image as ImageIcon,
   KeyRound,
   Lock,
   LogOut,
@@ -1339,7 +1340,7 @@ function App() {
                       onClick={() => setAttachmentPreview(cost.attachment || null)}
                       title="Pokaż załącznik"
                     >
-                      <Paperclip size={17} />
+                      {isImageAttachment(cost.attachment) ? <ImageIcon size={17} /> : <Paperclip size={17} />}
                     </button>
                   )}
                   <button
