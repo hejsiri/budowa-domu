@@ -546,10 +546,13 @@ function App() {
     const unpaidCosts = state.costs.filter((cost) => cost.status === 'unpaid')
     const paid = paidCosts.reduce((sum, cost) => sum + cost.amount, 0)
     const unpaid = unpaidCosts.reduce((sum, cost) => sum + cost.amount, 0)
+    const total = paid + unpaid
+    const paidProgress = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0
 
     return {
-      total: paid + unpaid,
+      total,
       paid,
+      paidProgress,
       unpaid,
       unpaidCostCount: unpaidCosts.length,
       paidInvestor: paidCosts.reduce((sum, cost) => {
@@ -1079,12 +1082,12 @@ function App() {
           <article className="stat-panel total">
             <span>Planowany koszt inwestycji</span>
             <strong>{formatCurrency(summary.total)}</strong>
-            <small>Wszystkie wydatki z rejestru</small>
+            <small>Zapłacone {summary.paidProgress}% planu</small>
             <div
               className="total-progress"
               aria-label={`Zapłacone ${formatCurrency(summary.paid)} z ${formatCurrency(summary.total)}`}
             >
-              <span style={{ width: `${summary.total > 0 ? (summary.paid / summary.total) * 100 : 0}%` }} />
+              <span style={{ width: `${summary.paidProgress}%` }} />
             </div>
           </article>
           <article className="stat-panel paid-summary">
