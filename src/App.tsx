@@ -1151,13 +1151,6 @@ function App() {
               {formatInteger(summary.unpaidCostCount)} pozycji
             </small>
           </article>
-          <article className="stat-panel task-summary">
-            <span>Zadania</span>
-            <strong>
-              {formatInteger(summary.todoTasks)}/{formatInteger(summary.todoTasks + summary.doneTasks)}
-            </strong>
-            <small>Do zrobienia / razem</small>
-          </article>
         </section>
 
         <nav className="section-tabs" aria-label="Widok panelu" role="tablist">

@@ -344,7 +344,7 @@ label > span {
   z-index: 1;
   display: grid;
   width: min(1040px, 100%);
-  grid-template-columns: 1.45fr repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin: 30px auto 0;
 }
@@ -1377,7 +1377,7 @@ input:disabled {
   }
 
   .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1410,7 +1410,7 @@ input:disabled {
 
   .stats-grid {
     width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 8px;
   }
 
@@ -1422,27 +1422,6 @@ input:disabled {
   .stat-panel strong {
     margin: 14px 0 6px;
     font-size: 1.38rem;
-  }
-
-  .stat-panel.total,
-  .stat-panel.paid-summary {
-    grid-column: 1 / -1;
-  }
-
-  .stat-panel.total {
-    order: 1;
-  }
-
-  .stat-panel.unpaid-summary {
-    order: 3;
-  }
-
-  .stat-panel.task-summary {
-    order: 4;
-  }
-
-  .stat-panel.paid-summary {
-    order: 2;
   }
 
   .modal-actions {
