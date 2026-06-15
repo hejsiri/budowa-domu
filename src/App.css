@@ -1073,6 +1073,10 @@ input:disabled {
   white-space: nowrap;
 }
 
+.amount-badge-mobile {
+  display: none;
+}
+
 .cost-split {
   color: var(--accent);
   font-size: 0.8rem;
@@ -1473,6 +1477,21 @@ input:disabled {
     grid-column: 2;
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .cost-card .item-title-row .amount-badge {
+    display: none;
+  }
+
+  .cost-card .item-actions {
+    align-items: center;
+  }
+
+  .cost-card .amount-badge-mobile {
+    display: inline-flex;
+    align-items: center;
+    order: 10;
+    margin-left: auto;
   }
 
   .stat-panel {

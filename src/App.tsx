@@ -1400,6 +1400,7 @@ function App() {
                   </p>
                 </div>
                 <div className="item-actions">
+                  <strong className="amount-badge amount-badge-mobile">{formatCurrency(cost.amount)}</strong>
                   {cost.commentHtml && (
                     <button
                       className="icon-button note-button"
