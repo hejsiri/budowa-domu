@@ -873,6 +873,10 @@ input:disabled {
   margin: 7px 0 0;
   color: var(--muted);
   font-size: 0.84rem;
+  font-weight: 400;
+}
+
+.empty {
   font-weight: 700;
 }
 
