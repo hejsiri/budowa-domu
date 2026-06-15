@@ -43,6 +43,8 @@
 .modal-head,
 .modal-actions,
 .auth-input,
+.hero-actions,
+.hero-icon-button,
 .logout-button {
   display: flex;
 }
@@ -173,11 +175,17 @@
   line-height: 1.35;
 }
 
-.logout-button {
+.hero-actions {
   position: absolute;
   z-index: 2;
   top: 18px;
   right: 18px;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-icon-button,
+.logout-button {
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -192,6 +200,18 @@
   cursor: pointer;
 }
 
+.hero-icon-button {
+  width: 34px;
+  padding: 0;
+}
+
+.hero-icon-button svg,
+.logout-button svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.hero-icon-button:hover,
 .logout-button:hover {
   background: rgba(255, 255, 255, 0.2);
 }
@@ -917,7 +937,7 @@ input:disabled {
     padding: 72px 14px 42px;
   }
 
-  .logout-button {
+  .hero-actions {
     top: 14px;
     right: 14px;
   }
@@ -951,7 +971,7 @@ input:disabled {
 
   .section-tabs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .section-tabs button {

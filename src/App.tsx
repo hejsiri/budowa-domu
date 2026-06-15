@@ -22,7 +22,7 @@ import './App.css'
 type TaskStatus = 'todo' | 'done'
 type PaymentStatus = 'unpaid' | 'paid'
 type CostPayer = 'me' | 'partner' | 'half' | 'custom'
-type ActiveSection = 'tasks' | 'costs' | 'settings'
+type ActiveSection = 'tasks' | 'costs'
 type AuthMode = 'login' | 'register' | 'verify'
 
 type AuthStatus = {
@@ -203,7 +203,7 @@ function App() {
   const [activeSection, setActiveSection] = useState<ActiveSection>('tasks')
   const [taskView, setTaskView] = useState<TaskStatus | 'all'>('todo')
   const [costView, setCostView] = useState<PaymentStatus | 'all'>('unpaid')
-  const [activeModal, setActiveModal] = useState<'task' | 'cost' | null>(null)
+  const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<File | undefined>()
@@ -358,6 +358,11 @@ function App() {
     setActiveModal('cost')
   }
 
+  function openSettingsModal() {
+    setSettingsForm(settings.investors)
+    setActiveModal('settings')
+  }
+
   const summary = useMemo(() => {
     const paid = state.costs
       .filter((cost) => cost.status === 'paid')
@@ -485,13 +490,20 @@ function App() {
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    await runServerAction(() =>
-      requestJson<AppState>(apiEndpoint('settings'), {
+    setError('')
+
+    try {
+      const nextState = await requestJson<AppState>(apiEndpoint('settings'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ investors: settingsForm }),
-      }),
-    )
+      })
+      setState({ ...nextState, settings: nextState.settings || defaultSettings })
+      setSettingsForm((nextState.settings || defaultSettings).investors)
+      closeModal()
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie zapisac ustawien.')
+    }
   }
 
   async function startRegistration(event: FormEvent<HTMLFormElement>) {
@@ -723,16 +735,22 @@ function App() {
       {error && <div className="notice">{error}</div>}
 
       <header className="page-hero">
+        <div className="hero-actions">
+          <button className="hero-icon-button" onClick={openSettingsModal} title="Ustawienia" aria-label="Ustawienia">
+            <Settings size={17} />
+          </button>
+          <button className="logout-button" onClick={logout}>
+            <LogOut size={16} />
+            Wyloguj
+          </button>
+        </div>
+
         <div className="brand">
           <span className="brand-mark">
             <Home size={25} />
           </span>
           <p>Panel inwestora</p>
           <h1>Budowa domu</h1>
-          <button className="logout-button" onClick={logout}>
-            <LogOut size={16} />
-            Wyloguj
-          </button>
         </div>
 
         <section className="stats-grid" aria-label="Podsumowanie">
@@ -786,17 +804,6 @@ function App() {
           >
             <BanknoteArrowDown size={18} />
             Wydatki
-          </button>
-          <button
-            className={activeSection === 'settings' ? 'active' : ''}
-            role="tab"
-            aria-selected={activeSection === 'settings'}
-            aria-controls="settings-panel"
-            id="settings-tab"
-            onClick={() => setActiveSection('settings')}
-          >
-            <Settings size={18} />
-            Ustawienia
           </button>
         </nav>
       </header>
@@ -985,45 +992,6 @@ function App() {
           </div>
         </section>
         )}
-
-        {activeSection === 'settings' && (
-        <section className="module" id="settings-panel" role="tabpanel" aria-labelledby="settings-tab">
-          <div className="module-heading">
-            <div>
-              <p>Konfiguracja</p>
-              <h2>Inwestorzy</h2>
-            </div>
-            <div className="module-actions">
-              <Settings size={24} />
-            </div>
-          </div>
-
-          <form className="entry-form settings-form" onSubmit={saveSettings}>
-            <label>
-              <span>Pierwszy inwestor</span>
-              <input
-                value={settingsForm.primary}
-                onChange={(event) => setSettingsForm({ ...settingsForm, primary: event.target.value })}
-                placeholder="np. Paweł"
-              />
-            </label>
-            <label>
-              <span>Drugi inwestor</span>
-              <input
-                value={settingsForm.partner}
-                onChange={(event) => setSettingsForm({ ...settingsForm, partner: event.target.value })}
-                placeholder="np. Anna"
-              />
-            </label>
-            <div className="modal-actions">
-              <button type="submit" className="primary-action">
-                <Check size={18} />
-                Zapisz ustawienia
-              </button>
-            </div>
-          </form>
-        </section>
-        )}
       </section>
 
       {activeModal && (
@@ -1037,15 +1005,23 @@ function App() {
           >
             <div className="modal-head">
               <div>
-                <p>{activeModal === 'task' ? 'Zadania budowy' : 'Wydatki budowy'}</p>
+                <p>
+                  {activeModal === 'task'
+                    ? 'Zadania budowy'
+                    : activeModal === 'cost'
+                      ? 'Wydatki budowy'
+                      : 'Konfiguracja'}
+                </p>
                 <h2 id="modal-title">
                   {activeModal === 'task'
                     ? editingTaskId
                       ? 'Edytuj zadanie'
                       : 'Dodaj zadanie'
-                    : editingCostId
-                      ? 'Edytuj wydatek'
-                      : 'Dodaj wydatek'}
+                    : activeModal === 'cost'
+                      ? editingCostId
+                        ? 'Edytuj wydatek'
+                        : 'Dodaj wydatek'
+                      : 'Ustawienia'}
                 </h2>
               </div>
               <button className="modal-close" onClick={closeModal} title="Zamknij">
@@ -1053,7 +1029,36 @@ function App() {
               </button>
             </div>
 
-            {activeModal === 'task' ? (
+            {activeModal === 'settings' ? (
+              <form className="entry-form settings-form modal-form" onSubmit={saveSettings}>
+                <label>
+                  <span>Pierwszy inwestor</span>
+                  <input
+                    value={settingsForm.primary}
+                    onChange={(event) => setSettingsForm({ ...settingsForm, primary: event.target.value })}
+                    placeholder="np. Paweł"
+                    autoFocus
+                  />
+                </label>
+                <label>
+                  <span>Drugi inwestor</span>
+                  <input
+                    value={settingsForm.partner}
+                    onChange={(event) => setSettingsForm({ ...settingsForm, partner: event.target.value })}
+                    placeholder="np. Anna"
+                  />
+                </label>
+                <div className="modal-actions">
+                  <button type="button" className="secondary-action" onClick={closeModal}>
+                    Anuluj
+                  </button>
+                  <button type="submit" className="primary-action">
+                    <Check size={18} />
+                    Zapisz ustawienia
+                  </button>
+                </div>
+              </form>
+            ) : activeModal === 'task' ? (
               <form className="entry-form modal-form" onSubmit={addTask}>
                 <label className="wide">
                   <span>Nazwa zadania</span>
