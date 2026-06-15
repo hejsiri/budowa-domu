@@ -1387,6 +1387,12 @@ function App() {
         )}
       </section>
 
+      <footer className="app-footer">
+        <a href="https://github.com/hejsiri/budowa-domu" target="_blank" rel="noreferrer">
+          Projekt na GitHubie
+        </a>
+      </footer>
+
       {activeModal && (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeModal}>
           <section
