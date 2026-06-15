@@ -1307,6 +1307,20 @@ input:disabled {
     width: 100%;
   }
 
+  .heading-action {
+    width: 40px;
+    padding: 0;
+  }
+
+  .heading-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
   .entry-form .wide {
     grid-column: auto;
   }

@@ -1145,7 +1145,7 @@ function App() {
               <ClipboardList size={24} />
               <button className="heading-action" onClick={openNewTaskModal}>
                 <Plus size={18} />
-                Dodaj zadanie
+                <span className="heading-action-label">Dodaj zadanie</span>
               </button>
             </div>
           </div>
@@ -1240,7 +1240,7 @@ function App() {
               <BanknoteArrowDown size={24} />
               <button className="heading-action" onClick={openNewCostModal}>
                 <Plus size={18} />
-                Dodaj wydatek
+                <span className="heading-action-label">Dodaj wydatek</span>
               </button>
             </div>
           </div>
