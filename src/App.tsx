@@ -1152,12 +1152,14 @@ function App() {
         {activeSection === 'tasks' && (
         <section className="module" id="tasks-panel" role="tabpanel" aria-labelledby="tasks-tab">
           <div className="module-heading">
-            <div>
-              <p>Zadania budowy</p>
-              <h2>Do zrobienia i zrobione</h2>
+            <div className="module-title">
+              <ClipboardList size={24} />
+              <div>
+                <p>Zadania budowy</p>
+                <h2>Do zrobienia i zrobione</h2>
+              </div>
             </div>
             <div className="module-actions">
-              <ClipboardList size={24} />
               <button className="heading-action" onClick={openNewTaskModal}>
                 <Plus size={18} />
                 <span className="heading-action-label">Dodaj zadanie</span>
@@ -1255,12 +1257,14 @@ function App() {
         {activeSection === 'costs' && (
         <section className="module" id="costs-panel" role="tabpanel" aria-labelledby="costs-tab">
           <div className="module-heading">
-            <div>
-              <p>Wydatki budowy</p>
-              <h2>Faktury, platnosci i sumy</h2>
+            <div className="module-title">
+              <BanknoteArrowDown size={24} />
+              <div>
+                <p>Wydatki budowy</p>
+                <h2>Faktury, platnosci i sumy</h2>
+              </div>
             </div>
             <div className="module-actions">
-              <BanknoteArrowDown size={24} />
               <button className="heading-action" onClick={openNewCostModal}>
                 <Plus size={18} />
                 <span className="heading-action-label">Dodaj wydatek</span>

@@ -538,15 +538,23 @@ label > span {
   font-weight: 700;
 }
 
+.module-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.module-title > svg {
+  flex: 0 0 auto;
+  display: block;
+  color: var(--accent-2);
+}
+
 .module-actions {
   align-items: center;
   gap: 10px;
   color: var(--accent-2);
-}
-
-.module-actions > svg {
-  flex: 0 0 auto;
-  display: block;
 }
 
 .heading-action {
