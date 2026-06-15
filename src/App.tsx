@@ -162,7 +162,7 @@ function costSplit(cost: Pick<Cost, 'payer' | 'investorShare' | 'partnerShare'>,
   }
 
   if (cost.payer === 'half') {
-    return { label: 'Płatność na pół', investorShare: 50, partnerShare: 50 }
+    return { label: 'Płatność', investorShare: 50, partnerShare: 50 }
   }
 
   if (cost.payer === 'custom') {
@@ -194,6 +194,10 @@ function costSplitLabel(cost: Cost, settings = defaultSettings) {
   }
 
   return `${split.label}: ${primaryName} ${formatCurrency(primaryAmount)}, ${partnerName} ${formatCurrency(partnerAmount)}`
+}
+
+function costStatusLabel(cost: Pick<Cost, 'status' | 'paidDate'>) {
+  return cost.status === 'paid' ? `zapłacone: ${cost.paidDate || 'bez daty'}` : 'do zapłaty'
 }
 
 const today = new Date().toISOString().slice(0, 10)
@@ -1083,7 +1087,7 @@ function App() {
             <small>
               {formatInteger(state.costs.filter((cost) => cost.status === 'paid').length)} pozycji
             </small>
-            <div className="investor-progress" aria-label="Podzial zaplaconych wydatkow">
+            <div className="investor-progress" aria-label="Podział zapłaconych wydatków">
               <div className="investor-progress-bar">
                 <span
                   className="investor-progress-primary"
@@ -1167,7 +1171,7 @@ function App() {
             </div>
           </div>
 
-          <div className="segmented" aria-label="Filtr zadan">
+          <div className="segmented" aria-label="Filtr zadań">
             <button className={taskView === 'todo' ? 'active' : ''} onClick={() => setTaskView('todo')}>
               Do zrobienia
             </button>
@@ -1180,8 +1184,8 @@ function App() {
           </div>
 
           <div className="list">
-            {isLoading ? <p className="empty">Laduje dane z serwera...</p> : null}
-            {!isLoading && filteredTasks.length === 0 ? <p className="empty">Brak zadan w tym widoku.</p> : null}
+            {isLoading ? <p className="empty">Ładuję dane z serwera...</p> : null}
+            {!isLoading && filteredTasks.length === 0 ? <p className="empty">Brak zadań w tym widoku.</p> : null}
             {filteredTasks.map((task) => (
               <article className={`item-card task-card${taskPriorityClass(task.priority)}`} key={task.id}>
                 <button
@@ -1244,7 +1248,7 @@ function App() {
                   >
                     <SquarePen size={17} />
                   </button>
-                  <button className="icon-button" onClick={() => deleteTask(task)} title="Usun zadanie">
+                  <button className="icon-button" onClick={() => deleteTask(task)} title="Usuń zadanie">
                     <Trash size={18} />
                   </button>
                 </div>
@@ -1261,7 +1265,7 @@ function App() {
               <BanknoteArrowDown size={24} />
               <div>
                 <p>Wydatki budowy</p>
-                <h2>Faktury, platnosci i sumy</h2>
+                <h2>Faktury, płatności i sumy</h2>
               </div>
             </div>
             <div className="module-actions">
@@ -1272,7 +1276,7 @@ function App() {
             </div>
           </div>
 
-          <div className="segmented" aria-label="Filtr wydatkow">
+          <div className="segmented" aria-label="Filtr wydatków">
             <button
               className={costView === 'unpaid' ? 'active' : ''}
               onClick={() => setCostView('unpaid')}
@@ -1288,14 +1292,14 @@ function App() {
           </div>
 
           <div className="list">
-            {isLoading ? <p className="empty">Laduje wydatki z serwera...</p> : null}
-            {!isLoading && filteredCosts.length === 0 ? <p className="empty">Brak wydatkow w tym widoku.</p> : null}
+            {isLoading ? <p className="empty">Ładuję wydatki z serwera...</p> : null}
+            {!isLoading && filteredCosts.length === 0 ? <p className="empty">Brak wydatków w tym widoku.</p> : null}
             {filteredCosts.map((cost) => (
               <article className="item-card cost-card" key={cost.id}>
                 <button
                   className={`status-dot ${cost.status}`}
                   onClick={() => toggleCost(cost.id)}
-                  title={cost.status === 'paid' ? 'Oznacz jako do zaplaty' : 'Oznacz jako zaplacone'}
+                  title={cost.status === 'paid' ? 'Oznacz jako do zapłaty' : 'Oznacz jako zapłacone'}
                 >
                   {cost.status === 'paid' && <Check size={16} />}
                 </button>
@@ -1304,12 +1308,8 @@ function App() {
                     <h3>{cost.title}</h3>
                     <strong className="amount-badge">{formatCurrency(cost.amount)}</strong>
                   </div>
-                  <p>
-                    {cost.area || 'Fundamenty'} · {cost.category} ·{' '}
-                    {cost.status === 'paid'
-                      ? `zaplacone ${cost.paidDate || 'bez daty'}`
-                      : 'do zaplaty'}
-                  </p>
+                  <p>{cost.area || 'Fundamenty'} · {cost.category}</p>
+                  <p>{costStatusLabel(cost)}</p>
                   <p className="cost-split">
                     {costSplitLabel(cost, settings)}
                   </p>
@@ -1340,7 +1340,7 @@ function App() {
                   >
                     <SquarePen size={17} />
                   </button>
-                  <button className="icon-button" onClick={() => deleteCost(cost)} title="Usun wydatek">
+                  <button className="icon-button" onClick={() => deleteCost(cost)} title="Usuń wydatek">
                     <Trash size={18} />
                   </button>
                 </div>
@@ -1600,7 +1600,7 @@ function App() {
                   </select>
                 </label>
                 <label>
-                  <span>Kiedy zaplacono</span>
+                  <span>Kiedy zapłacono</span>
                   <input
                     type="date"
                     value={costForm.paidDate}
@@ -1608,7 +1608,7 @@ function App() {
                     onChange={(event) => setCostForm({ ...costForm, paidDate: event.target.value })}
                   />
                 </label>
-                <div className="quick-split wide" aria-label="Szybkie ustawienia platnosci">
+                <div className="quick-split wide" aria-label="Szybkie ustawienia płatności">
                   <button type="button" className={costForm.payer === 'me' ? 'active' : ''} onClick={() => setCostPayer('me')}>
                     {settings.investors.primary}
                   </button>
