@@ -1250,6 +1250,22 @@ input:disabled {
     grid-column: 1 / -1;
   }
 
+  .stat-panel.total {
+    order: 1;
+  }
+
+  .stat-panel.unpaid-summary {
+    order: 2;
+  }
+
+  .stat-panel.task-summary {
+    order: 3;
+  }
+
+  .stat-panel.paid-summary {
+    order: 4;
+  }
+
   .entry-form .wide {
     grid-column: auto;
   }

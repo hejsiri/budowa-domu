@@ -1020,7 +1020,7 @@ function App() {
             <strong>{formatCurrency(summary.total)}</strong>
             <small>Wszystkie wydatki z rejestru</small>
           </article>
-          <article className="stat-panel">
+          <article className="stat-panel unpaid-summary">
             <span>Do zapłaty</span>
             <strong>{formatCurrency(summary.unpaid)}</strong>
             <small>
@@ -1054,7 +1054,7 @@ function App() {
               </div>
             </div>
           </article>
-          <article className="stat-panel">
+          <article className="stat-panel task-summary">
             <span>Zadania</span>
             <strong>
               {formatInteger(summary.todoTasks)}/{formatInteger(summary.todoTasks + summary.doneTasks)}
