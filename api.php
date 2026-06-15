@@ -3,6 +3,17 @@ declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 
+$requiredPhpVersion = '7.4.0';
+if (version_compare(PHP_VERSION, $requiredPhpVersion, '<')) {
+    http_response_code(500);
+    echo json_encode([
+        'message' => 'Hosting ma za stara wersje PHP. Wymagane PHP ' . $requiredPhpVersion . ' lub nowsze, aktualnie: ' . PHP_VERSION . '.',
+        'requiredPhpVersion' => $requiredPhpVersion,
+        'currentPhpVersion' => PHP_VERSION,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $dataDir = __DIR__ . '/storage';
 $uploadsDir = __DIR__ . '/uploads';
 $dataFile = $dataDir . '/budowa.json';
