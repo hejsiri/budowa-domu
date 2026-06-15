@@ -771,15 +771,8 @@ function App() {
 
   if (authLoading) {
     return (
-      <main className="auth-shell">
-        <section className="auth-card">
-          <span className="auth-mark">
-            <Home size={24} />
-          </span>
-          <p>Budowa domu</p>
-          <h1>Sprawdzam dostęp</h1>
-          <div className="auth-empty">Ładowanie...</div>
-        </section>
+      <main className="app-loading" aria-label="Ładowanie">
+        <span />
       </main>
     )
   }
