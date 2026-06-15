@@ -991,10 +991,17 @@ input:disabled {
   background: #3d4650;
 }
 
-.cost-card strong {
+.amount-badge {
   flex: 0 0 auto;
+  border: 1px solid #bfd0dc;
+  border-radius: 999px;
+  padding: 5px 10px;
   color: var(--accent);
+  background: #e7f0f6;
   font-size: 0.92rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .cost-split {

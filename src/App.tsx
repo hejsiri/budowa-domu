@@ -1302,7 +1302,7 @@ function App() {
                 <div className="item-main">
                   <div className="item-title-row">
                     <h3>{cost.title}</h3>
-                    <strong>{formatCurrency(cost.amount)}</strong>
+                    <strong className="amount-badge">{formatCurrency(cost.amount)}</strong>
                   </div>
                   <p>
                     {cost.area || 'Fundamenty'} · {cost.category} ·{' '}
