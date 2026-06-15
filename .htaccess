@@ -1,0 +1,12 @@
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^$ dist/index.html [L]
+  RewriteRule ^api\.php$ api.php [L]
+  RewriteRule ^server/uploads/(.*)$ server/uploads/$1 [L]
+  RewriteRule ^assets/(.*)$ dist/assets/$1 [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . dist/index.html [L]
+</IfModule>

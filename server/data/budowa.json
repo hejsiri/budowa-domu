@@ -1,0 +1,174 @@
+{
+    "tasks": [
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418001",
+            "title": "Sprawdzic aktualny harmonogram prac z wykonawca",
+            "area": "Dokumenty",
+            "priority": "Pilne",
+            "dueDate": "2026-06-15",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418002",
+            "title": "Zamowic geodete do wytyczenia osi budynku",
+            "area": "Fundamenty",
+            "priority": "Pilne",
+            "dueDate": "2026-06-16",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418003",
+            "title": "Potwierdzic dostawe bloczkow fundamentowych",
+            "area": "Stan surowy",
+            "priority": "Normalne",
+            "dueDate": "2026-06-17",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418004",
+            "title": "Przygotowac miejsce pod zbrojenie law",
+            "area": "Fundamenty",
+            "priority": "Normalne",
+            "dueDate": "2026-06-18",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418005",
+            "title": "Zrobic liste brakujacych narzedzi na budowie",
+            "area": "Sprzet",
+            "priority": "Niskie",
+            "dueDate": "2026-06-19",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418006",
+            "title": "Umowic odbior zbrojenia przez kierownika budowy",
+            "area": "Fundamenty",
+            "priority": "Pilne",
+            "dueDate": "2026-06-20",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418007",
+            "title": "Porownac ceny betonu z dwoch betoniarni",
+            "area": "Materialy",
+            "priority": "Normalne",
+            "dueDate": "2026-06-21",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418008",
+            "title": "Sprawdzic dojazd dla gruszki z betonem",
+            "area": "Stan surowy",
+            "priority": "Normalne",
+            "dueDate": "2026-06-22",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418009",
+            "title": "Zamowic folie i styropian pod posadzke",
+            "area": "Materialy",
+            "priority": "Normalne",
+            "dueDate": "2026-06-23",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418010",
+            "title": "Uzgodnic termin dostawy stali zbrojeniowej",
+            "area": "Materialy",
+            "priority": "Pilne",
+            "dueDate": "2026-06-24",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418011",
+            "title": "Przejrzec projekt instalacji wodnej",
+            "area": "Instalacje",
+            "priority": "Niskie",
+            "dueDate": "2026-06-25",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418012",
+            "title": "Zrobic zdjecia postepu prac do dokumentacji",
+            "area": "Dokumenty",
+            "priority": "Niskie",
+            "dueDate": "2026-06-26",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418013",
+            "title": "Spisac faktury i paragony z ostatniego tygodnia",
+            "area": "Dokumenty",
+            "priority": "Normalne",
+            "dueDate": "2026-06-27",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418014",
+            "title": "Zweryfikowac zamowienie materialow na sciany",
+            "area": "Sciany",
+            "priority": "Normalne",
+            "dueDate": "2026-06-28",
+            "status": "todo"
+        },
+        {
+            "id": "5e7d1f64-5c8d-4d83-8a1b-b3fd3d418015",
+            "title": "Przygotowac pytania do kierownika budowy",
+            "area": "Dokumenty",
+            "priority": "Niskie",
+            "dueDate": "2026-06-29",
+            "status": "todo"
+        },
+        {
+            "id": "0b4fd16a-4f95-4a8b-a61d-b0e729899e5b",
+            "title": "Zamowic kierownika budowy na odbior zbrojenia",
+            "area": "Fundamenty",
+            "priority": "Pilne",
+            "dueDate": "2026-06-18",
+            "status": "todo"
+        },
+        {
+            "id": "92707773-4a86-4e85-812a-db3df67b1ad9",
+            "title": "Zapisac pomiar geodety do dokumentow",
+            "area": "Dokumenty",
+            "priority": "Normalne",
+            "dueDate": "2026-06-10",
+            "status": "done"
+        }
+    ],
+    "costs": [
+        {
+            "id": "35e48606-0776-4587-a3a1-33b60708dd67",
+            "title": "Materiały",
+            "area": "Materialy",
+            "category": "Materiały",
+            "amount": 120,
+            "status": "paid",
+            "paidDate": "2026-06-12",
+            "attachment": {
+                "name": "image.jpg",
+                "path": "server\/uploads\/1781296821-image.jpg",
+                "mimeType": "image\/jpeg"
+            }
+        },
+        {
+            "id": "7a3b663c-cf77-4508-a309-047557051321",
+            "title": "transport",
+            "area": "Transport",
+            "category": "Materiały",
+            "amount": 1200,
+            "status": "paid",
+            "paidDate": "2026-06-12"
+        },
+        {
+            "id": "c466f46a-75f4-41b6-a9e4-5168aa22994d",
+            "title": "Mapa do celow projektowych",
+            "area": "Dokumenty",
+            "category": "Dokumenty",
+            "amount": 850,
+            "status": "paid",
+            "paidDate": "2026-06-05"
+        }
+    ]
+}
