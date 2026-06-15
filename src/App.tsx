@@ -1089,6 +1089,7 @@ function App() {
         <div className="hero-actions">
           <button className="hero-icon-button" onClick={openSettingsModal} title="Ustawienia" aria-label="Ustawienia">
             <Settings size={17} />
+            <span>Ustawienia</span>
           </button>
           <button className="logout-button" onClick={logout} title="Wyloguj" aria-label="Wyloguj">
             <LogOut size={16} />

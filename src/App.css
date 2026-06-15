@@ -225,8 +225,7 @@
 }
 
 .hero-icon-button {
-  width: 34px;
-  padding: 0;
+  width: auto;
 }
 
 .hero-icon-button svg,
@@ -1376,6 +1375,7 @@ input:disabled {
     padding: 0;
   }
 
+  .hero-icon-button span,
   .logout-button span {
     display: none;
   }
