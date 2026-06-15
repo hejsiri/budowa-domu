@@ -107,7 +107,7 @@ function userCount(string $usersFile): int
     return count(getUsers($usersFile)['users']);
 }
 
-function cleanEmail(mixed $value): string
+function cleanEmail($value): string
 {
     return strtolower(trim((string)($value ?? '')));
 }
@@ -146,7 +146,9 @@ function createSession(string $sessionsFile, string $email): void
     $sessions = readStorageFile($sessionsFile, ['sessions' => []]);
     $sessions['sessions'] = array_values(array_filter(
         $sessions['sessions'] ?? [],
-        static fn(array $session): bool => (int)($session['expiresAt'] ?? 0) > time()
+        static function (array $session): bool {
+            return (int)($session['expiresAt'] ?? 0) > time();
+        }
     ));
     $sessions['sessions'][] = [
         'tokenHash' => hash('sha256', $token),
@@ -185,7 +187,9 @@ function clearSession(string $sessionsFile): void
         $sessions = readStorageFile($sessionsFile, ['sessions' => []]);
         $sessions['sessions'] = array_values(array_filter(
             $sessions['sessions'] ?? [],
-            static fn(array $session): bool => !hash_equals((string)($session['tokenHash'] ?? ''), $tokenHash)
+            static function (array $session) use ($tokenHash): bool {
+                return !hash_equals((string)($session['tokenHash'] ?? ''), $tokenHash);
+            }
         ));
         writeStorageFile($sessionsFile, $sessions);
     }
@@ -235,7 +239,7 @@ function writeState(string $dataFile, array $state): void
     file_put_contents($dataFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
 }
 
-function cleanText(mixed $value, string $fallback = ''): string
+function cleanText($value, string $fallback = ''): string
 {
     $text = trim((string)($value ?? $fallback));
     return $text !== '' ? $text : $fallback;
@@ -309,7 +313,7 @@ function deleteAttachmentFiles(array $attachments): void
     }
 }
 
-function respond(mixed $payload, int $status = 200): never
+function respond($payload, int $status = 200): void
 {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
