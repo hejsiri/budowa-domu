@@ -1292,15 +1292,15 @@ input:disabled {
   }
 
   .stat-panel.unpaid-summary {
-    order: 2;
-  }
-
-  .stat-panel.task-summary {
     order: 3;
   }
 
-  .stat-panel.paid-summary {
+  .stat-panel.task-summary {
     order: 4;
+  }
+
+  .stat-panel.paid-summary {
+    order: 2;
   }
 
   .modal-actions {

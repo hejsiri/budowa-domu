@@ -1077,13 +1077,6 @@ function App() {
             <strong>{formatCurrency(summary.total)}</strong>
             <small>Wszystkie wydatki z rejestru</small>
           </article>
-          <article className="stat-panel unpaid-summary">
-            <span>Do zapłaty</span>
-            <strong>{formatCurrency(summary.unpaid)}</strong>
-            <small>
-              {formatInteger(summary.unpaidCostCount)} pozycji
-            </small>
-          </article>
           <article className="stat-panel paid-summary">
             <span>Zapłacone</span>
             <strong>{formatCurrency(summary.paid)}</strong>
@@ -1110,6 +1103,13 @@ function App() {
                 </span>
               </div>
             </div>
+          </article>
+          <article className="stat-panel unpaid-summary">
+            <span>Do zapłaty</span>
+            <strong>{formatCurrency(summary.unpaid)}</strong>
+            <small>
+              {formatInteger(summary.unpaidCostCount)} pozycji
+            </small>
           </article>
           <article className="stat-panel task-summary">
             <span>Zadania</span>
