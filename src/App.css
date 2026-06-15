@@ -982,13 +982,13 @@ input:disabled {
 
 .note-button,
 .attachment-button {
-  color: var(--accent);
-  background: #eef3f6;
+  color: #ffffff;
+  background: #47515b;
 }
 
 .note-button:hover,
 .attachment-button:hover {
-  background: #e2eaf0;
+  background: #3d4650;
 }
 
 .cost-card strong {
