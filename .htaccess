@@ -3,8 +3,9 @@ DirectoryIndex index.html index.php
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
+  RewriteRule ^storage(/|$) - [F,L]
+  RewriteRule ^uploads(/|$) - [F,L]
   RewriteRule ^api\.php$ api.php [L]
-  RewriteRule ^uploads/(.*)$ uploads/$1 [L]
   RewriteRule ^assets/(.*)$ assets/$1 [L]
 
   RewriteCond %{REQUEST_FILENAME} !-f

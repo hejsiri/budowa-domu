@@ -445,6 +445,23 @@ try {
         respond(['message' => 'Sesja wygasla. Zaloguj sie ponownie.'], 401);
     }
 
+    if ($resource === 'file' && $method === 'GET') {
+        $relativePath = ltrim((string)($_GET['path'] ?? ''), '/');
+        $fileName = basename($relativePath);
+        $filePath = $uploadsDir . '/' . $fileName;
+
+        if ($relativePath === '' || $relativePath !== 'uploads/' . $fileName || !is_file($filePath)) {
+            respond(['message' => 'Nie znaleziono pliku.'], 404);
+        }
+
+        $mimeType = mime_content_type($filePath) ?: 'application/octet-stream';
+        header('Content-Type: ' . $mimeType);
+        header('Content-Disposition: inline; filename="' . addslashes($fileName) . '"');
+        header('Content-Length: ' . (string)filesize($filePath));
+        readfile($filePath);
+        exit;
+    }
+
     if ($resource === 'tasks' && $method === 'POST') {
         $title = cleanText($_POST['title'] ?? '');
 

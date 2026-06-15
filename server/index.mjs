@@ -414,6 +414,27 @@ app.get('/api/state', async (_request, response, next) => {
   }
 })
 
+app.get('/api/file', async (request, response, next) => {
+  try {
+    const relativePath = String(request.query.path || '').replace(/^\//, '')
+    const fileName = path.basename(relativePath)
+    const filePath = path.join(uploadsDir, fileName)
+
+    if (!relativePath || relativePath !== `uploads/${fileName}`) {
+      response.status(404).json({ message: 'Nie znaleziono pliku.' })
+      return
+    }
+
+    response.sendFile(filePath, (error) => {
+      if (error && !response.headersSent) {
+        next(error)
+      }
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
 app.post('/api/tasks', upload.array('attachments[]', 8), async (request, response, next) => {
   try {
     const state = await readState()

@@ -109,7 +109,10 @@ function apiEndpoint(resource: string, id?: string, action?: string) {
 }
 
 function attachmentHref(path: string) {
-  return isDevServer ? path : path.replace(/^\//, '')
+  const cleanPath = path.replace(/^\//, '')
+  return isDevServer
+    ? `/api/file?path=${encodeURIComponent(cleanPath)}`
+    : `api.php?resource=file&path=${encodeURIComponent(cleanPath)}`
 }
 
 async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
