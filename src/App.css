@@ -1212,7 +1212,7 @@ input:disabled {
 
 @media (max-width: 760px) {
   .page-hero {
-    padding: 72px 12px 30px;
+    padding: 72px 12px 22px;
   }
 
   .hero-actions {
@@ -1227,8 +1227,23 @@ input:disabled {
 
   .stats-grid {
     width: 100%;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+  }
+
+  .stat-panel {
+    min-height: 118px;
+    padding: 14px;
+  }
+
+  .stat-panel strong {
+    margin: 14px 0 6px;
+    font-size: 1.38rem;
+  }
+
+  .stat-panel.total,
+  .stat-panel.paid-summary {
+    grid-column: 1 / -1;
   }
 
   .entry-form .wide {
@@ -1237,7 +1252,7 @@ input:disabled {
 
   .workspace {
     width: calc(100% - 20px);
-    margin-top: 24px;
+    margin-top: 16px;
   }
 
   .module-heading,
@@ -1258,7 +1273,7 @@ input:disabled {
     display: grid;
     width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin: 18px auto 0;
+    margin: 14px auto 0;
     border-bottom: 0;
   }
 
@@ -1322,11 +1337,11 @@ input:disabled {
   }
 
   .stat-panel {
-    min-height: 112px;
-    padding: 14px;
+    min-height: 108px;
+    padding: 13px;
   }
 
   .stat-panel strong {
-    font-size: 1.32rem;
+    font-size: 1.28rem;
   }
 }

@@ -1016,7 +1016,7 @@ function App() {
 
         <section className="stats-grid" aria-label="Podsumowanie">
           <article className="stat-panel total">
-            <span>Budzet wpisany</span>
+            <span>Budżet wpisany</span>
             <strong>{formatCurrency(summary.total)}</strong>
             <small>Wszystkie wydatki z rejestru</small>
           </article>
@@ -1027,7 +1027,7 @@ function App() {
               {formatInteger(state.costs.filter((cost) => cost.status === 'unpaid').length)} pozycji
             </small>
           </article>
-          <article className="stat-panel">
+          <article className="stat-panel paid-summary">
             <span>Zapłacone</span>
             <strong>{formatCurrency(summary.paid)}</strong>
             <small>
