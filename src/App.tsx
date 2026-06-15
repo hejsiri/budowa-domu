@@ -269,7 +269,7 @@ function App() {
   const [error, setError] = useState('')
   const [activeSection, setActiveSection] = useState<ActiveSection>('tasks')
   const [taskView, setTaskView] = useState<TaskStatus | 'all'>('todo')
-  const [costView, setCostView] = useState<PaymentStatus | 'all'>('unpaid')
+  const [costView, setCostView] = useState<PaymentStatus | 'all'>('all')
   const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
