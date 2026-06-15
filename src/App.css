@@ -476,19 +476,6 @@ label > span {
   background: rgba(255, 255, 255, 0.18);
 }
 
-.total-progress::after {
-  position: absolute;
-  inset: 0;
-  content: '';
-  background: repeating-linear-gradient(
-    90deg,
-    transparent,
-    transparent calc(10% - 1px),
-    rgba(12, 38, 66, 0.2) calc(10% - 1px),
-    rgba(12, 38, 66, 0.2) 10%
-  );
-}
-
 .total-progress span {
   position: relative;
   z-index: 1;
@@ -513,19 +500,6 @@ label > span {
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.16);
-}
-
-.investor-progress-bar::after {
-  position: absolute;
-  inset: 0;
-  content: '';
-  background: repeating-linear-gradient(
-    90deg,
-    transparent,
-    transparent calc(10% - 1px),
-    rgba(12, 38, 66, 0.22) calc(10% - 1px),
-    rgba(12, 38, 66, 0.22) 10%
-  );
 }
 
 .investor-progress-bar span {
