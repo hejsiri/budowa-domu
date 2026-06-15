@@ -1078,7 +1078,7 @@ function App() {
             <small>Wszystkie wydatki z rejestru</small>
           </article>
           <article className="stat-panel paid-summary">
-            <span>Zapłacone</span>
+            <span>Zapłacone do tej pory</span>
             <strong>{formatCurrency(summary.paid)}</strong>
             <small>
               {formatInteger(state.costs.filter((cost) => cost.status === 'paid').length)} pozycji
