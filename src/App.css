@@ -39,6 +39,7 @@
 .item-actions,
 .item-title-row,
 .attachment-link,
+.attachment-list,
 .modal-head,
 .modal-actions,
 .auth-input,
@@ -473,7 +474,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 46px;
   box-sizing: border-box;
@@ -487,6 +489,13 @@ select {
   font-weight: 600;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+textarea {
+  min-height: 104px;
+  padding-top: 11px;
+  resize: vertical;
+  line-height: 1.4;
 }
 
 select {
@@ -503,7 +512,8 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--accent-2);
   background: #ffffff;
   box-shadow: 0 0 0 4px rgba(37, 99, 135, 0.14);
@@ -637,6 +647,13 @@ input:disabled {
   font-weight: 700;
 }
 
+.item-comment {
+  color: #354250;
+  font-weight: 650;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .empty {
   padding: 24px 18px;
   border: 1.5px dashed var(--border);
@@ -745,6 +762,19 @@ input:disabled {
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.attachment-list {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.attachment-list .attachment-link {
+  max-width: min(100%, 280px);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #eef3f6;
 }
 
 .modal-backdrop {

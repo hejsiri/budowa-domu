@@ -36,6 +36,8 @@ type Task = {
   priority: string
   dueDate: string
   status: TaskStatus
+  comment?: string
+  attachments?: Attachment[]
 }
 
 type Attachment = {
@@ -146,11 +148,13 @@ function App() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<File | undefined>()
+  const [taskAttachments, setTaskAttachments] = useState<File[]>([])
   const [taskForm, setTaskForm] = useState({
     title: '',
     area: 'Fundamenty',
     priority: 'Normalne',
     dueDate: today,
+    comment: '',
   })
   const [costForm, setCostForm] = useState({
     title: '',
@@ -217,7 +221,14 @@ function App() {
   }, [])
 
   function resetTaskForm() {
-    setTaskForm({ title: '', area: 'Fundamenty', priority: 'Normalne', dueDate: today })
+    setTaskForm({
+      title: '',
+      area: 'Fundamenty',
+      priority: 'Normalne',
+      dueDate: today,
+      comment: '',
+    })
+    setTaskAttachments([])
   }
 
   function resetCostForm() {
@@ -250,7 +261,9 @@ function App() {
       area: task.area,
       priority: task.priority,
       dueDate: task.dueDate,
+      comment: task.comment || '',
     })
+    setTaskAttachments([])
     setEditingTaskId(task.id)
     setActiveModal('task')
   }
@@ -321,14 +334,22 @@ function App() {
       return
     }
 
+    const body = new FormData()
+    body.append('title', taskForm.title)
+    body.append('area', taskForm.area)
+    body.append('priority', taskForm.priority)
+    body.append('dueDate', taskForm.dueDate)
+    body.append('comment', taskForm.comment)
+    taskAttachments.forEach((file) => body.append('attachments[]', file))
+
     await runServerAction(() =>
       requestJson<Task | AppState>(apiEndpoint('tasks', editingTaskId || undefined), {
-        method: editingTaskId ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskForm),
+        method: 'POST',
+        body,
       }),
     )
     resetTaskForm()
+    event.currentTarget.reset()
     closeModal()
   }
 
@@ -340,6 +361,10 @@ function App() {
 
   function deleteTask(id: string) {
     runServerAction(() => requestJson<AppState>(apiEndpoint('tasks', id), { method: 'DELETE' }))
+  }
+
+  function onTaskAttachmentsChange(event: ChangeEvent<HTMLInputElement>) {
+    setTaskAttachments(Array.from(event.target.files || []))
   }
 
   function onInvoiceChange(event: ChangeEvent<HTMLInputElement>) {
@@ -730,6 +755,22 @@ function App() {
                   <p>
                     {task.area} · termin {task.dueDate || 'bez daty'}
                   </p>
+                  {task.comment && <p className="item-comment">{task.comment}</p>}
+                  {task.attachments && task.attachments.length > 0 && (
+                    <div className="attachment-list">
+                      {task.attachments.map((attachment) => (
+                        <a
+                          className="attachment-link"
+                          href={attachmentHref(attachment.path)}
+                          target="_blank"
+                          key={attachment.path}
+                        >
+                          <FileText size={16} />
+                          {attachment.name}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="item-actions">
                   <button
@@ -904,6 +945,27 @@ function App() {
                     value={taskForm.dueDate}
                     onChange={(event) => setTaskForm({ ...taskForm, dueDate: event.target.value })}
                   />
+                </label>
+                <label className="wide">
+                  <span>Komentarz</span>
+                  <textarea
+                    value={taskForm.comment}
+                    onChange={(event) => setTaskForm({ ...taskForm, comment: event.target.value })}
+                    placeholder="np. ustalenia z ekipą, uwagi do odbioru"
+                    rows={4}
+                  />
+                </label>
+                <label className="file-input wide">
+                  <span>{editingTaskId ? 'Nowe załączniki' : 'Załączniki'}</span>
+                  <input type="file" accept="image/*,.pdf" multiple onChange={onTaskAttachmentsChange} />
+                  <em>
+                    <Paperclip size={16} />
+                    {taskAttachments.length > 0
+                      ? taskAttachments.map((file) => file.name).join(', ')
+                      : editingTaskId
+                        ? 'Zostaw bez zmian lub dodaj pliki'
+                        : 'Dodaj PDF albo zdjęcia'}
+                  </em>
                 </label>
                 <div className="modal-actions">
                   <button type="button" className="secondary-action" onClick={closeModal}>

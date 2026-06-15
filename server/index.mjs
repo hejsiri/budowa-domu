@@ -25,6 +25,8 @@ const initialState = {
       area: 'Stan surowy',
       priority: 'Pilne',
       dueDate: '2026-06-18',
+      comment: '',
+      attachments: [],
       status: 'todo',
     },
     {
@@ -33,6 +35,8 @@ const initialState = {
       area: 'Materialy',
       priority: 'Normalne',
       dueDate: '2026-06-21',
+      comment: '',
+      attachments: [],
       status: 'todo',
     },
     {
@@ -41,6 +45,8 @@ const initialState = {
       area: 'Dokumenty',
       priority: 'Normalne',
       dueDate: '2026-06-10',
+      comment: '',
+      attachments: [],
       status: 'done',
     },
   ],
@@ -128,6 +134,24 @@ function cleanText(value, fallback = '') {
 
 function getToday() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function fileAttachment(file) {
+  return {
+    name: file.originalname,
+    path: `/uploads/${file.filename}`,
+    mimeType: file.mimetype,
+  }
+}
+
+async function deleteAttachments(attachments = []) {
+  await Promise.all(
+    attachments
+      .filter((attachment) => attachment?.path)
+      .map((attachment) =>
+        fs.rm(path.join(rootDir, attachment.path.replace(/^\//, '')), { force: true }).catch(() => undefined),
+      ),
+  )
 }
 
 async function readStorageFile(file, fallback) {
@@ -390,7 +414,7 @@ app.get('/api/state', async (_request, response, next) => {
   }
 })
 
-app.post('/api/tasks', async (request, response, next) => {
+app.post('/api/tasks', upload.array('attachments[]', 8), async (request, response, next) => {
   try {
     const state = await readState()
     const task = {
@@ -399,6 +423,8 @@ app.post('/api/tasks', async (request, response, next) => {
       area: cleanText(request.body.area, 'Stan surowy'),
       priority: cleanText(request.body.priority, 'Normalne'),
       dueDate: cleanText(request.body.dueDate),
+      comment: cleanText(request.body.comment),
+      attachments: (request.files || []).map(fileAttachment),
       status: 'todo',
     }
 
@@ -410,6 +436,42 @@ app.post('/api/tasks', async (request, response, next) => {
     state.tasks = [task, ...state.tasks]
     await writeState(state)
     response.status(201).json(task)
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/tasks/:id', upload.array('attachments[]', 8), async (request, response, next) => {
+  try {
+    const state = await readState()
+    const attachments = (request.files || []).map(fileAttachment)
+    let updatedTask = null
+
+    state.tasks = state.tasks.map((task) => {
+      if (task.id !== request.params.id) {
+        return task
+      }
+
+      updatedTask = {
+        ...task,
+        title: cleanText(request.body.title),
+        area: cleanText(request.body.area, 'Stan surowy'),
+        priority: cleanText(request.body.priority, 'Normalne'),
+        dueDate: cleanText(request.body.dueDate),
+        comment: cleanText(request.body.comment),
+        attachments: [...(task.attachments || []), ...attachments],
+      }
+
+      return updatedTask
+    })
+
+    if (!updatedTask?.title) {
+      response.status(400).json({ message: 'Brakuje nazwy zadania.' })
+      return
+    }
+
+    await writeState(state)
+    response.json(state)
   } catch (error) {
     next(error)
   }
@@ -446,6 +508,7 @@ app.patch('/api/tasks/:id', async (request, response, next) => {
         area: cleanText(request.body.area, 'Stan surowy'),
         priority: cleanText(request.body.priority, 'Normalne'),
         dueDate: cleanText(request.body.dueDate),
+        comment: cleanText(request.body.comment),
       }
 
       return updatedTask
@@ -466,8 +529,10 @@ app.patch('/api/tasks/:id', async (request, response, next) => {
 app.delete('/api/tasks/:id', async (request, response, next) => {
   try {
     const state = await readState()
+    const task = state.tasks.find((item) => item.id === request.params.id)
     state.tasks = state.tasks.filter((task) => task.id !== request.params.id)
     await writeState(state)
+    await deleteAttachments(task?.attachments)
     response.json(state)
   } catch (error) {
     next(error)

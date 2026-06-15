@@ -20,6 +20,8 @@ $initialState = [
             'area' => 'Stan surowy',
             'priority' => 'Pilne',
             'dueDate' => '2026-06-18',
+            'comment' => '',
+            'attachments' => [],
             'status' => 'todo',
         ],
         [
@@ -28,6 +30,8 @@ $initialState = [
             'area' => 'Materialy',
             'priority' => 'Normalne',
             'dueDate' => '2026-06-21',
+            'comment' => '',
+            'attachments' => [],
             'status' => 'todo',
         ],
         [
@@ -36,6 +40,8 @@ $initialState = [
             'area' => 'Dokumenty',
             'priority' => 'Normalne',
             'dueDate' => '2026-06-10',
+            'comment' => '',
+            'attachments' => [],
             'status' => 'done',
         ],
     ],
@@ -235,6 +241,74 @@ function cleanText(mixed $value, string $fallback = ''): string
     return $text !== '' ? $text : $fallback;
 }
 
+function uploadedFiles(string $field): array
+{
+    if (!isset($_FILES[$field])) {
+        return [];
+    }
+
+    $fileSet = $_FILES[$field];
+    if (!is_array($fileSet['name'])) {
+        return [$fileSet];
+    }
+
+    $files = [];
+    foreach ($fileSet['name'] as $index => $name) {
+        $files[] = [
+            'name' => $name,
+            'type' => $fileSet['type'][$index] ?? 'application/octet-stream',
+            'tmp_name' => $fileSet['tmp_name'][$index] ?? '',
+            'error' => $fileSet['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+            'size' => $fileSet['size'][$index] ?? 0,
+        ];
+    }
+
+    return $files;
+}
+
+function saveUploadedFiles(string $field, string $uploadsDir, string $fallbackBaseName): array
+{
+    $attachments = [];
+
+    foreach (uploadedFiles($field) as $file) {
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$file['tmp_name'])) {
+            continue;
+        }
+
+        $originalName = basename((string)$file['name']);
+        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+        $baseName = preg_replace('/[^a-zA-Z0-9-]+/', '-', pathinfo($originalName, PATHINFO_FILENAME)) ?: $fallbackBaseName;
+        $fileName = time() . '-' . bin2hex(random_bytes(4)) . '-' . trim(substr($baseName, 0, 50), '-') . ($extension ? '.' . $extension : '');
+        $target = $uploadsDir . '/' . $fileName;
+
+        if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
+            respond(['message' => 'Nie udalo sie zapisac zalacznika.'], 500);
+        }
+
+        $attachments[] = [
+            'name' => $originalName,
+            'path' => 'uploads/' . $fileName,
+            'mimeType' => (string)($file['type'] ?? 'application/octet-stream'),
+        ];
+    }
+
+    return $attachments;
+}
+
+function deleteAttachmentFiles(array $attachments): void
+{
+    foreach ($attachments as $attachment) {
+        if (!isset($attachment['path'])) {
+            continue;
+        }
+
+        $filePath = __DIR__ . '/' . ltrim((string)$attachment['path'], '/');
+        if (is_file($filePath)) {
+            unlink($filePath);
+        }
+    }
+}
+
 function respond(mixed $payload, int $status = 200): never
 {
     http_response_code($status);
@@ -357,19 +431,39 @@ try {
     }
 
     if ($resource === 'tasks' && $method === 'POST') {
-        $body = readJsonBody();
-        $title = cleanText($body['title'] ?? '');
+        $title = cleanText($_POST['title'] ?? '');
 
         if ($title === '') {
             respond(['message' => 'Brakuje nazwy zadania.'], 400);
         }
 
+        $attachments = saveUploadedFiles('attachments', $uploadsDir, 'zadanie');
+
+        if ($id !== '') {
+            foreach ($state['tasks'] as &$task) {
+                if (($task['id'] ?? '') === $id) {
+                    $task['title'] = $title;
+                    $task['area'] = cleanText($_POST['area'] ?? '', 'Inne');
+                    $task['priority'] = cleanText($_POST['priority'] ?? '', 'Normalne');
+                    $task['dueDate'] = cleanText($_POST['dueDate'] ?? '');
+                    $task['comment'] = cleanText($_POST['comment'] ?? '');
+                    $task['attachments'] = array_values(array_merge($task['attachments'] ?? [], $attachments));
+                }
+            }
+            unset($task);
+
+            writeState($dataFile, $state);
+            respond($state);
+        }
+
         $task = [
             'id' => uuid(),
             'title' => $title,
-            'area' => cleanText($body['area'] ?? '', 'Inne'),
-            'priority' => cleanText($body['priority'] ?? '', 'Normalne'),
-            'dueDate' => cleanText($body['dueDate'] ?? ''),
+            'area' => cleanText($_POST['area'] ?? '', 'Inne'),
+            'priority' => cleanText($_POST['priority'] ?? '', 'Normalne'),
+            'dueDate' => cleanText($_POST['dueDate'] ?? ''),
+            'comment' => cleanText($_POST['comment'] ?? ''),
+            'attachments' => $attachments,
             'status' => 'todo',
         ];
 
@@ -413,10 +507,21 @@ try {
     }
 
     if ($resource === 'tasks' && $method === 'DELETE') {
+        $deleted = null;
         $state['tasks'] = array_values(array_filter(
             $state['tasks'],
-            static fn(array $task): bool => ($task['id'] ?? '') !== $id
+            static function (array $task) use ($id, &$deleted): bool {
+                if (($task['id'] ?? '') === $id) {
+                    $deleted = $task;
+                    return false;
+                }
+                return true;
+            }
         ));
+
+        if (isset($deleted['attachments']) && is_array($deleted['attachments'])) {
+            deleteAttachmentFiles($deleted['attachments']);
+        }
 
         writeState($dataFile, $state);
         respond($state);
