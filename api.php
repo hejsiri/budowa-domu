@@ -305,13 +305,18 @@ function cleanTime($value, string $fallback = ''): string
     return preg_match('/^\d{2}:\d{2}$/', $time) === 1 ? $time : $fallback;
 }
 
+function cleanPriority($value): string
+{
+    return cleanText($value ?? '', 'Normalne') === 'Pilne' ? 'Pilne' : 'Normalne';
+}
+
 function normalizeTask($task): array
 {
     $task = is_array($task) ? $task : [];
     $task['id'] = cleanText($task['id'] ?? '', uuid());
     $task['title'] = cleanText($task['title'] ?? '');
     $task['area'] = cleanText($task['area'] ?? '', 'Inne');
-    $task['priority'] = cleanText($task['priority'] ?? '', 'Normalne');
+    $task['priority'] = cleanPriority($task['priority'] ?? '');
     $task['dueDate'] = cleanText($task['dueDate'] ?? '');
     $task['startTime'] = cleanTime($task['startTime'] ?? '', '09:00');
     $task['endTime'] = cleanTime($task['endTime'] ?? '', '10:00');
@@ -660,7 +665,7 @@ try {
                 if (($task['id'] ?? '') === $id) {
                     $task['title'] = $title;
                     $task['area'] = cleanText($_POST['area'] ?? '', 'Inne');
-                    $task['priority'] = cleanText($_POST['priority'] ?? '', 'Normalne');
+                    $task['priority'] = cleanPriority($_POST['priority'] ?? '');
                     $task['dueDate'] = cleanText($_POST['dueDate'] ?? '');
                     $task['startTime'] = cleanTime($_POST['startTime'] ?? '', '09:00');
                     $task['endTime'] = cleanTime($_POST['endTime'] ?? '', '10:00');
@@ -678,7 +683,7 @@ try {
             'id' => uuid(),
             'title' => $title,
             'area' => cleanText($_POST['area'] ?? '', 'Inne'),
-            'priority' => cleanText($_POST['priority'] ?? '', 'Normalne'),
+            'priority' => cleanPriority($_POST['priority'] ?? ''),
             'dueDate' => cleanText($_POST['dueDate'] ?? ''),
             'startTime' => cleanTime($_POST['startTime'] ?? '', '09:00'),
             'endTime' => cleanTime($_POST['endTime'] ?? '', '10:00'),
@@ -716,7 +721,7 @@ try {
             if (($task['id'] ?? '') === $id) {
                 $task['title'] = $title;
                 $task['area'] = cleanText($body['area'] ?? '', 'Inne');
-                $task['priority'] = cleanText($body['priority'] ?? '', 'Normalne');
+                $task['priority'] = cleanPriority($body['priority'] ?? '');
                 $task['dueDate'] = cleanText($body['dueDate'] ?? '');
                 $task['startTime'] = cleanTime($body['startTime'] ?? '', '09:00');
                 $task['endTime'] = cleanTime($body['endTime'] ?? '', '10:00');

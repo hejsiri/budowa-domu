@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
+import type { ChangeEvent, DragEvent, FormEvent } from 'react'
 import {
   BanknoteArrowDown,
   Check,
@@ -200,6 +200,10 @@ function isImageAttachment(attachment: Attachment) {
   return attachment.mimeType.startsWith('image/')
 }
 
+function taskPriority(priority: string) {
+  return priority === 'Pilne' ? 'Pilne' : 'Normalne'
+}
+
 async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: 'same-origin', ...options })
 
@@ -238,6 +242,8 @@ function App() {
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<File | undefined>()
   const [taskAttachments, setTaskAttachments] = useState<File[]>([])
+  const [taskDropActive, setTaskDropActive] = useState(false)
+  const [invoiceDropActive, setInvoiceDropActive] = useState(false)
   const [taskForm, setTaskForm] = useState({
     title: '',
     area: 'Fundamenty',
@@ -254,6 +260,8 @@ function App() {
     amount: '',
     payer: 'me' as CostPayer,
     investorShare: '100',
+    investorAmount: '',
+    partnerAmount: '',
     status: 'unpaid' as PaymentStatus,
     paidDate: '',
   })
@@ -341,6 +349,8 @@ function App() {
       amount: '',
       payer: 'me',
       investorShare: '100',
+      investorAmount: '',
+      partnerAmount: '',
       status: 'unpaid',
       paidDate: '',
     })
@@ -367,7 +377,7 @@ function App() {
     setTaskForm({
       title: task.title,
       area: task.area,
-      priority: task.priority,
+      priority: taskPriority(task.priority),
       dueDate: task.dueDate,
       startTime: task.startTime || '09:00',
       endTime: task.endTime || '10:00',
@@ -385,13 +395,19 @@ function App() {
   }
 
   function openEditCostModal(cost: Cost) {
+    const split = costSplit(cost, settings)
+    const investorAmount = (cost.amount * split.investorShare) / 100
+    const partnerAmount = (cost.amount * split.partnerShare) / 100
+
     setCostForm({
       title: cost.title,
       area: cost.area || 'Stan surowy',
       category: cost.category,
       amount: String(cost.amount),
       payer: cost.payer || 'me',
-      investorShare: String(costSplit(cost, settings).investorShare),
+      investorShare: String(split.investorShare),
+      investorAmount: investorAmount ? String(Number(investorAmount.toFixed(2))) : '',
+      partnerAmount: partnerAmount ? String(Number(partnerAmount.toFixed(2))) : '',
       status: cost.status,
       paidDate: cost.paidDate,
     })
@@ -440,9 +456,95 @@ function App() {
       } else {
         await refreshState()
       }
+      return true
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie zapisac zmian.')
+      return false
     }
+  }
+
+  function formatAmountInput(value: number) {
+    return Number.isFinite(value) && value > 0 ? String(Number(value.toFixed(2))) : ''
+  }
+
+  function setCostPayer(payer: CostPayer) {
+    const amount = Number(costForm.amount)
+    const halfAmount = Number.isFinite(amount) ? amount / 2 : 0
+    const nextForm = { ...costForm, payer }
+
+    if (payer === 'me') {
+      nextForm.investorShare = '100'
+      nextForm.investorAmount = costForm.amount
+      nextForm.partnerAmount = ''
+    } else if (payer === 'partner') {
+      nextForm.investorShare = '0'
+      nextForm.investorAmount = ''
+      nextForm.partnerAmount = costForm.amount
+    } else if (payer === 'half') {
+      nextForm.investorShare = '50'
+      nextForm.investorAmount = formatAmountInput(halfAmount)
+      nextForm.partnerAmount = formatAmountInput(halfAmount)
+    }
+
+    setCostForm(nextForm)
+  }
+
+  function setCostAmount(amount: string) {
+    const numericAmount = Number(amount)
+    const halfAmount = Number.isFinite(numericAmount) ? numericAmount / 2 : 0
+
+    setCostForm((current) => ({
+      ...current,
+      amount,
+      investorAmount:
+        current.payer === 'partner'
+          ? ''
+          : current.payer === 'half'
+            ? formatAmountInput(halfAmount)
+            : current.payer === 'custom'
+              ? current.investorAmount
+              : amount,
+      partnerAmount:
+        current.payer === 'me'
+          ? ''
+          : current.payer === 'half'
+            ? formatAmountInput(halfAmount)
+            : current.payer === 'custom'
+              ? current.partnerAmount
+              : amount,
+    }))
+  }
+
+  function setInvestorAmount(investorAmount: string) {
+    setCostForm((current) => {
+      if (current.payer === 'half') {
+        const amount = Number(investorAmount)
+        return {
+          ...current,
+          investorAmount,
+          partnerAmount: investorAmount,
+          amount: formatAmountInput(Number.isFinite(amount) ? amount * 2 : 0),
+        }
+      }
+
+      if (current.payer === 'me') {
+        return { ...current, investorAmount, amount: investorAmount }
+      }
+
+      const amount = Number(investorAmount) + Number(current.partnerAmount || 0)
+      return { ...current, investorAmount, amount: formatAmountInput(amount) }
+    })
+  }
+
+  function setPartnerAmount(partnerAmount: string) {
+    setCostForm((current) => {
+      if (current.payer === 'partner') {
+        return { ...current, partnerAmount, amount: partnerAmount }
+      }
+
+      const amount = Number(current.investorAmount || 0) + Number(partnerAmount)
+      return { ...current, partnerAmount, amount: formatAmountInput(amount) }
+    })
   }
 
   async function addTask(event: FormEvent<HTMLFormElement>) {
@@ -461,15 +563,17 @@ function App() {
     body.append('comment', taskForm.comment)
     taskAttachments.forEach((file) => body.append('attachments[]', file))
 
-    await runServerAction(() =>
+    const saved = await runServerAction(() =>
       requestJson<Task | AppState>(apiEndpoint('tasks', editingTaskId || undefined), {
         method: 'POST',
         body,
       }),
     )
-    resetTaskForm()
-    event.currentTarget.reset()
-    closeModal()
+    if (saved) {
+      resetTaskForm()
+      event.currentTarget.reset()
+      closeModal()
+    }
   }
 
   function toggleTask(id: string) {
@@ -490,6 +594,22 @@ function App() {
     setInvoice(event.target.files?.[0])
   }
 
+  function onTaskAttachmentsDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setTaskDropActive(false)
+    setTaskAttachments(Array.from(event.dataTransfer.files).filter((file) => {
+      return file.type.startsWith('image/') || file.type === 'application/pdf'
+    }))
+  }
+
+  function onInvoiceDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setInvoiceDropActive(false)
+    setInvoice(Array.from(event.dataTransfer.files).find((file) => {
+      return file.type.startsWith('image/') || file.type === 'application/pdf'
+    }))
+  }
+
   async function addCost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const amount = Number(costForm.amount)
@@ -497,29 +617,42 @@ function App() {
       return
     }
 
+    const investorAmount = costForm.payer === 'partner' ? 0 : Number(costForm.investorAmount || amount)
+    const investorShare =
+      costForm.payer === 'me'
+        ? 100
+        : costForm.payer === 'partner'
+          ? 0
+          : amount > 0
+            ? normalizeShare((investorAmount / amount) * 100)
+            : normalizeShare(Number(costForm.investorShare))
+    const partnerShare = normalizeShare(100 - investorShare)
+
     const body = new FormData()
     body.append('title', costForm.title)
     body.append('area', costForm.area)
     body.append('category', costForm.category)
     body.append('amount', costForm.amount)
     body.append('payer', costForm.payer)
-    body.append('investorShare', costForm.investorShare)
-    body.append('partnerShare', String(100 - normalizeShare(Number(costForm.investorShare))))
+    body.append('investorShare', String(investorShare))
+    body.append('partnerShare', String(partnerShare))
     body.append('status', costForm.status)
     body.append('paidDate', costForm.paidDate)
     if (invoice) {
       body.append('invoice', invoice)
     }
 
-    await runServerAction(() =>
+    const saved = await runServerAction(() =>
       requestJson<Cost | AppState>(apiEndpoint('costs', editingCostId || undefined), {
         method: 'POST',
         body,
       }),
     )
-    resetCostForm()
-    event.currentTarget.reset()
-    closeModal()
+    if (saved) {
+      resetCostForm()
+      event.currentTarget.reset()
+      closeModal()
+    }
   }
 
   function toggleCost(id: string) {
@@ -885,7 +1018,7 @@ function App() {
             {isLoading ? <p className="empty">Laduje dane z serwera...</p> : null}
             {!isLoading && filteredTasks.length === 0 ? <p className="empty">Brak zadan w tym widoku.</p> : null}
             {filteredTasks.map((task) => (
-              <article className={`item-card task-card priority-${task.priority.toLowerCase()}`} key={task.id}>
+              <article className={`item-card task-card priority-${taskPriority(task.priority).toLowerCase()}`} key={task.id}>
                 <button
                   className={`status-dot ${task.status}`}
                   onClick={() => toggleTask(task.id)}
@@ -896,7 +1029,7 @@ function App() {
                 <div className="item-main">
                   <div className="item-title-row">
                     <h3>{task.title}</h3>
-                    <span className={`badge ${task.priority.toLowerCase()}`}>{task.priority}</span>
+                    <span className={`badge ${taskPriority(task.priority).toLowerCase()}`}>{taskPriority(task.priority)}</span>
                   </div>
                   <p>
                     {task.area} · termin {formatTaskDateTime(task)}
@@ -1142,7 +1275,6 @@ function App() {
                   >
                     <option>Normalne</option>
                     <option>Pilne</option>
-                    <option>Niskie</option>
                   </select>
                 </label>
                 <label>
@@ -1178,7 +1310,15 @@ function App() {
                     rows={4}
                   />
                 </label>
-                <label className="file-input wide">
+                <label
+                  className={`file-input wide drop-input ${taskDropActive ? 'is-dragging' : ''}`}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setTaskDropActive(true)
+                  }}
+                  onDragLeave={() => setTaskDropActive(false)}
+                  onDrop={onTaskAttachmentsDrop}
+                >
                   <span>{editingTaskId ? 'Nowe załączniki' : 'Załączniki'}</span>
                   <input type="file" accept="image/*,.pdf" multiple onChange={onTaskAttachmentsChange} />
                   <em>
@@ -1186,8 +1326,8 @@ function App() {
                     {taskAttachments.length > 0
                       ? taskAttachments.map((file) => file.name).join(', ')
                       : editingTaskId
-                        ? 'Zostaw bez zmian lub dodaj pliki'
-                        : 'Dodaj PDF albo zdjęcia'}
+                        ? 'Zostaw bez zmian albo przeciągnij pliki'
+                        : 'Dodaj lub przeciągnij PDF albo zdjęcia'}
                   </em>
                 </label>
                 <div className="modal-actions">
@@ -1248,7 +1388,7 @@ function App() {
                     min="0"
                     step="0.01"
                     value={costForm.amount}
-                    onChange={(event) => setCostForm({ ...costForm, amount: event.target.value })}
+                    onChange={(event) => setCostAmount(event.target.value)}
                     placeholder="0,00"
                   />
                 </label>
@@ -1269,10 +1409,7 @@ function App() {
                   <select
                     value={costForm.payer}
                     onChange={(event) => {
-                      const payer = event.target.value as CostPayer
-                      const investorShare =
-                        payer === 'me' ? '100' : payer === 'partner' ? '0' : payer === 'half' ? '50' : costForm.investorShare
-                      setCostForm({ ...costForm, payer, investorShare })
+                      setCostPayer(event.target.value as CostPayer)
                     }}
                   >
                     <option value="me">{settings.investors.primary}</option>
@@ -1281,19 +1418,43 @@ function App() {
                     <option value="custom">Inny podział</option>
                   </select>
                 </label>
-                {costForm.payer === 'custom' && (
+                <div className="quick-split wide" aria-label="Szybkie ustawienia platnosci">
+                  <button type="button" className={costForm.payer === 'me' ? 'active' : ''} onClick={() => setCostPayer('me')}>
+                    {settings.investors.primary}
+                  </button>
+                  <button type="button" className={costForm.payer === 'half' ? 'active' : ''} onClick={() => setCostPayer('half')}>
+                    50:50
+                  </button>
+                  <button type="button" className={costForm.payer === 'partner' ? 'active' : ''} onClick={() => setCostPayer('partner')}>
+                    {settings.investors.partner}
+                  </button>
+                  <button type="button" className={costForm.payer === 'custom' ? 'active' : ''} onClick={() => setCostPayer('custom')}>
+                    Inny
+                  </button>
+                </div>
+                {costForm.payer !== 'partner' && (
                   <label>
-                    <span>Udział: {settings.investors.primary} %</span>
+                    <span>Ile płaci: {settings.investors.primary}</span>
                     <input
                       type="number"
                       min="0"
-                      max="100"
-                      step="1"
-                      value={costForm.investorShare}
-                      onChange={(event) =>
-                        setCostForm({ ...costForm, investorShare: event.target.value })
-                      }
-                      placeholder="50"
+                      step="0.01"
+                      value={costForm.investorAmount}
+                      onChange={(event) => setInvestorAmount(event.target.value)}
+                      placeholder="0,00"
+                    />
+                  </label>
+                )}
+                {costForm.payer !== 'me' && (
+                  <label>
+                    <span>Ile płaci: {settings.investors.partner}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={costForm.partnerAmount}
+                      onChange={(event) => setPartnerAmount(event.target.value)}
+                      placeholder="0,00"
                     />
                   </label>
                 )}
@@ -1306,12 +1467,20 @@ function App() {
                     onChange={(event) => setCostForm({ ...costForm, paidDate: event.target.value })}
                   />
                 </label>
-                <label className="file-input wide">
+                <label
+                  className={`file-input wide drop-input ${invoiceDropActive ? 'is-dragging' : ''}`}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setInvoiceDropActive(true)
+                  }}
+                  onDragLeave={() => setInvoiceDropActive(false)}
+                  onDrop={onInvoiceDrop}
+                >
                   <span>{editingCostId ? 'Nowa faktura' : 'Faktura'}</span>
                   <input type="file" accept="image/*,.pdf" onChange={onInvoiceChange} />
                   <em>
                     <Paperclip size={16} />
-                    {invoice ? invoice.name : editingCostId ? 'Zostaw bez zmian lub dodaj plik' : 'Dodaj plik'}
+                    {invoice ? invoice.name : editingCostId ? 'Zostaw bez zmian albo przeciągnij plik' : 'Dodaj lub przeciągnij plik'}
                   </em>
                 </label>
                 <div className="modal-actions">

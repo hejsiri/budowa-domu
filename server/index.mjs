@@ -178,13 +178,17 @@ function cleanTime(value, fallback = '') {
   return /^\d{2}:\d{2}$/.test(time) ? time : fallback
 }
 
+function cleanPriority(value) {
+  return cleanText(value, 'Normalne') === 'Pilne' ? 'Pilne' : 'Normalne'
+}
+
 function normalizeTask(task = {}) {
   return {
     ...task,
     id: cleanText(task.id, randomUUID()),
     title: cleanText(task.title),
     area: cleanText(task.area, 'Inne'),
-    priority: cleanText(task.priority, 'Normalne'),
+    priority: cleanPriority(task.priority),
     dueDate: cleanText(task.dueDate),
     startTime: cleanTime(task.startTime, '09:00'),
     endTime: cleanTime(task.endTime, '10:00'),
@@ -626,7 +630,7 @@ app.post('/api/tasks', upload.array('attachments[]', 8), async (request, respons
       id: randomUUID(),
       title: cleanText(request.body.title),
       area: cleanText(request.body.area, 'Stan surowy'),
-      priority: cleanText(request.body.priority, 'Normalne'),
+      priority: cleanPriority(request.body.priority),
       dueDate: cleanText(request.body.dueDate),
       startTime: cleanTime(request.body.startTime, '09:00'),
       endTime: cleanTime(request.body.endTime, '10:00'),
@@ -663,7 +667,7 @@ app.post('/api/tasks/:id', upload.array('attachments[]', 8), async (request, res
         ...task,
         title: cleanText(request.body.title),
         area: cleanText(request.body.area, 'Stan surowy'),
-        priority: cleanText(request.body.priority, 'Normalne'),
+        priority: cleanPriority(request.body.priority),
         dueDate: cleanText(request.body.dueDate),
         startTime: cleanTime(request.body.startTime, '09:00'),
         endTime: cleanTime(request.body.endTime, '10:00'),
@@ -715,7 +719,7 @@ app.patch('/api/tasks/:id', async (request, response, next) => {
         ...task,
         title: cleanText(request.body.title),
         area: cleanText(request.body.area, 'Stan surowy'),
-        priority: cleanText(request.body.priority, 'Normalne'),
+        priority: cleanPriority(request.body.priority),
         dueDate: cleanText(request.body.dueDate),
         startTime: cleanTime(request.body.startTime, '09:00'),
         endTime: cleanTime(request.body.endTime, '10:00'),
