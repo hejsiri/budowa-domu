@@ -670,25 +670,21 @@ input:disabled {
   background: #256387;
   font-size: 0.72rem;
   font-weight: 900;
-  box-shadow: 0 8px 18px rgba(37, 99, 135, 0.18);
 }
 
 .badge.pilne {
   color: #ffffff;
   background: #c0392b;
-  box-shadow: 0 8px 18px rgba(192, 57, 43, 0.2);
 }
 
 .badge.normalne {
   color: #ffffff;
   background: #256387;
-  box-shadow: 0 8px 18px rgba(37, 99, 135, 0.18);
 }
 
 .badge.niskie {
   color: #ffffff;
   background: #2f8f5b;
-  box-shadow: 0 8px 18px rgba(47, 143, 91, 0.2);
 }
 
 .status-dot,
@@ -718,14 +714,13 @@ input:disabled {
   height: 34px;
   color: #ffffff;
   background: #c0392b;
-  box-shadow: 0 10px 20px rgba(192, 57, 43, 0.18);
-  transition: transform 0.16s, filter 0.16s, box-shadow 0.16s;
+  box-shadow: none;
+  transition: transform 0.16s, filter 0.16s;
 }
 
 .icon-button:hover {
   filter: brightness(1.04);
   transform: translateY(-1px);
-  box-shadow: 0 12px 22px rgba(192, 57, 43, 0.22);
 }
 
 .item-actions {
@@ -736,11 +731,6 @@ input:disabled {
 .edit-button {
   color: #ffffff;
   background: #256387;
-  box-shadow: 0 10px 20px rgba(37, 99, 135, 0.18);
-}
-
-.edit-button:hover {
-  box-shadow: 0 12px 22px rgba(37, 99, 135, 0.22);
 }
 
 .cost-card strong {
