@@ -240,6 +240,10 @@ function taskPriority(priority: string) {
   return priority === 'Pilne' ? 'Pilne' : 'Normalne'
 }
 
+function taskPriorityClass(priority: string) {
+  return taskPriority(priority) === 'Pilne' ? ' priority-pilne' : ''
+}
+
 function sanitizeRichTextHtml(html: string) {
   const template = document.createElement('template')
   template.innerHTML = html.slice(0, richTextLimit)
@@ -1154,7 +1158,7 @@ function App() {
             {isLoading ? <p className="empty">Laduje dane z serwera...</p> : null}
             {!isLoading && filteredTasks.length === 0 ? <p className="empty">Brak zadan w tym widoku.</p> : null}
             {filteredTasks.map((task) => (
-              <article className={`item-card task-card priority-${taskPriority(task.priority).toLowerCase()}`} key={task.id}>
+              <article className={`item-card task-card${taskPriorityClass(task.priority)}`} key={task.id}>
                 <button
                   className={`status-dot ${task.status}`}
                   onClick={() => toggleTask(task.id)}

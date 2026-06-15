@@ -903,6 +903,10 @@ input:disabled {
   background: #c0392b;
 }
 
+.badge.normalne {
+  display: none;
+}
+
 .status-dot,
 .icon-button {
   display: grid;
@@ -1226,7 +1230,7 @@ input:disabled {
 
 @media (max-width: 760px) {
   .page-hero {
-    padding: 72px 12px 10px;
+    padding: 72px 12px 18px;
   }
 
   .hero-actions {
@@ -1282,7 +1286,7 @@ input:disabled {
 
   .workspace {
     width: calc(100% - 20px);
-    margin-top: 0;
+    margin-top: 14px;
   }
 
   .section-tabs {
