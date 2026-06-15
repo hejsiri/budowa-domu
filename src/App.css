@@ -1005,7 +1005,8 @@ input:disabled {
 }
 
 .status-dot.planned {
-  border-color: #d08a2e;
+  border-color: #cbd5dc;
+  color: #697683;
   background: #ffffff;
 }
 

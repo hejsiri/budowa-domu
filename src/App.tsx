@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   Home,
+  Hourglass,
   Image as ImageIcon,
   KeyRound,
   Lock,
@@ -1386,6 +1387,7 @@ function App() {
                   onClick={() => toggleCost(cost.id)}
                   title={costToggleTitle(cost.status)}
                 >
+                  {cost.status === 'planned' && <Hourglass size={15} />}
                   {cost.status === 'paid' && <Check size={16} />}
                 </button>
                 <div className="item-main">
