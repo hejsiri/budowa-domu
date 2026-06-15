@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, DragEvent, FormEvent } from 'react'
+import type { ChangeEvent, Dispatch, DragEvent, FormEvent, SetStateAction } from 'react'
 import {
   BanknoteArrowDown,
   Check,
@@ -28,6 +28,7 @@ type ActiveSection = 'tasks' | 'costs'
 type AuthMode = 'login' | 'register' | 'verify'
 type TaskView = TaskStatus | 'all'
 type CostView = PaymentStatus | 'all'
+type FileSetter = Dispatch<SetStateAction<File[]>>
 
 type AuthStatus = {
   authenticated: boolean
@@ -282,12 +283,38 @@ function costAttachments(cost: Cost) {
   return attachments
 }
 
+function fileKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}-${file.type}`
+}
+
+function mergeFiles(current: File[], next: File[]) {
+  const existingKeys = new Set(current.map(fileKey))
+  return [...current, ...next.filter((file) => !existingKeys.has(fileKey(file)))]
+}
+
+function appendFiles(setter: FileSetter, files: File[]) {
+  if (files.length === 0) {
+    return
+  }
+
+  setter((current) => mergeFiles(current, files))
+}
+
+function isImageFile(file: File) {
+  return file.type.startsWith('image/') || /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)
+}
+
 function fileListLabel(files: File[], emptyLabel: string) {
-  return files.length > 0 ? files.map((file) => file.name).join(', ') : emptyLabel
+  if (files.length === 0) {
+    return emptyLabel
+  }
+
+  const visibleNames = files.slice(0, 2).map((file) => file.name).join(', ')
+  return files.length > 2 ? `${visibleNames} oraz ${files.length - 2} więcej` : visibleNames
 }
 
 async function resizeImageFile(file: File, maxWidth = 1920, maxHeight = 1080) {
-  if (!file.type.startsWith('image/')) {
+  if (!isImageFile(file)) {
     return file
   }
 
@@ -319,16 +346,20 @@ async function resizeImageFile(file: File, maxWidth = 1920, maxHeight = 1080) {
   }
 
   context.drawImage(image, 0, 0, canvas.width, canvas.height)
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, file.type || 'image/jpeg', 0.86))
-  return blob ? new File([blob], file.name, { type: file.type || 'image/jpeg', lastModified: Date.now() }) : file
+  const outputType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ? file.type : 'image/jpeg'
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, outputType, 0.86))
+  return blob ? new File([blob], file.name, { type: outputType, lastModified: Date.now() }) : file
 }
 
 async function prepareImageFiles(files: File[]) {
-  return Promise.all(files.filter((file) => file.type.startsWith('image/')).map((file) => resizeImageFile(file)))
+  const images = files.filter(isImageFile)
+  const prepared = await Promise.allSettled(images.map((file) => resizeImageFile(file)))
+
+  return prepared.map((result, index) => (result.status === 'fulfilled' ? result.value : images[index]))
 }
 
 function documentFiles(files: File[]) {
-  return files.filter((file) => !file.type.startsWith('image/'))
+  return files.filter((file) => !isImageFile(file))
 }
 
 function taskPriority(priority: string) {
@@ -868,16 +899,16 @@ function App() {
     runServerAction(() => requestJson<AppState>(apiEndpoint('tasks', task.id), { method: 'DELETE' }))
   }
 
-  function onDocumentFilesChange(setter: (files: File[]) => void) {
+  function onDocumentFilesChange(setter: FileSetter) {
     return (event: ChangeEvent<HTMLInputElement>) => {
-      setter(documentFiles(Array.from(event.target.files || [])))
+      appendFiles(setter, documentFiles(Array.from(event.target.files || [])))
       event.target.value = ''
     }
   }
 
-  function onImageFilesChange(setter: (files: File[]) => void) {
+  function onImageFilesChange(setter: FileSetter) {
     return async (event: ChangeEvent<HTMLInputElement>) => {
-      setter(await prepareImageFiles(Array.from(event.target.files || [])))
+      appendFiles(setter, await prepareImageFiles(Array.from(event.target.files || [])))
       event.target.value = ''
     }
   }
@@ -886,16 +917,16 @@ function App() {
     event.preventDefault()
     setTaskDropActive(false)
     const files = Array.from(event.dataTransfer.files)
-    setTaskDocumentFiles(documentFiles(files))
-    setTaskImageFiles(await prepareImageFiles(files))
+    appendFiles(setTaskDocumentFiles, documentFiles(files))
+    appendFiles(setTaskImageFiles, await prepareImageFiles(files))
   }
 
   async function onInvoiceDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
     setInvoiceDropActive(false)
     const files = Array.from(event.dataTransfer.files)
-    setCostDocumentFiles(documentFiles(files))
-    setCostImageFiles(await prepareImageFiles(files))
+    appendFiles(setCostDocumentFiles, documentFiles(files))
+    appendFiles(setCostImageFiles, await prepareImageFiles(files))
   }
 
   async function addCost(event: FormEvent<HTMLFormElement>) {
