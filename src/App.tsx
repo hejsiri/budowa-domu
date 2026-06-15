@@ -449,18 +449,25 @@ function App() {
   async function runServerAction(action: () => Promise<AppState | Task | Cost>) {
     setError('')
 
+    let result: AppState | Task | Cost
     try {
-      const result = await action()
+      result = await action()
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie zapisac zmian.')
+      return false
+    }
+
+    try {
       if ('tasks' in result && 'costs' in result) {
         setState({ ...result, settings: result.settings || settings })
       } else {
         await refreshState()
       }
-      return true
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie zapisac zmian.')
-      return false
     }
+
+    return true
   }
 
   function formatAmountInput(value: number) {
