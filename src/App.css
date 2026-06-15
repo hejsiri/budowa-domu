@@ -1216,7 +1216,7 @@ input:disabled {
 
 @media (max-width: 760px) {
   .page-hero {
-    padding: 72px 12px 0;
+    padding: 72px 12px 10px;
   }
 
   .hero-actions {
@@ -1304,20 +1304,30 @@ input:disabled {
     align-items: flex-start;
   }
 
-  .module-heading,
-  .module-actions,
   .modal-actions {
     align-items: stretch;
   }
 
-  .module-actions,
   .modal-actions {
     flex-direction: column;
   }
 
-  .heading-action,
   .modal-actions button {
     width: 100%;
+  }
+
+  .module-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .module-actions > svg {
+    display: none;
+  }
+
+  .heading-action {
+    width: auto;
   }
 
   .item-card {
