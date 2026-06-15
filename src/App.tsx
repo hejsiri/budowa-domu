@@ -1532,7 +1532,7 @@ function App() {
                   </label>
                 )}
                 <div className="settings-section wide">
-                  <p>Nowe hasło</p>
+                  <p>Zmiana hasła</p>
                 </div>
                 <label>
                   <span>Aktualne hasło</span>
