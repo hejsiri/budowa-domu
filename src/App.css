@@ -998,6 +998,11 @@ input:disabled {
   background: var(--accent-2);
 }
 
+.status-dot.planned {
+  border-color: #d08a2e;
+  background: #ffffff;
+}
+
 .icon-button {
   width: 34px;
   height: 34px;

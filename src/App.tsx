@@ -22,7 +22,7 @@ import {
 import './App.css'
 
 type TaskStatus = 'todo' | 'done'
-type PaymentStatus = 'unpaid' | 'paid'
+type PaymentStatus = 'planned' | 'unpaid' | 'paid'
 type CostPayer = 'me' | 'partner' | 'half' | 'custom'
 type ActiveSection = 'tasks' | 'costs'
 type AuthMode = 'login' | 'register' | 'verify'
@@ -194,7 +194,7 @@ function costSplitLabel(cost: Cost, settings = defaultSettings) {
   const partnerName = settings.investors.partner || defaultSettings.investors.partner
   const primaryAmount = (cost.amount * split.investorShare) / 100
   const partnerAmount = (cost.amount * split.partnerShare) / 100
-  const prefix = cost.status === 'paid' ? 'Zapłacił' : 'Płaci'
+  const prefix = cost.status === 'paid' ? 'Zapłacił' : cost.status === 'planned' ? 'Planowane' : 'Płaci'
 
   if (split.investorShare === 100 && split.partnerShare === 0) {
     return `${prefix} ${primaryName}: ${formatCurrency(primaryAmount)}`
@@ -204,11 +204,23 @@ function costSplitLabel(cost: Cost, settings = defaultSettings) {
     return `${prefix} ${partnerName}: ${formatCurrency(partnerAmount)}`
   }
 
-  return `${split.label}: ${primaryName} ${formatCurrency(primaryAmount)}, ${partnerName} ${formatCurrency(partnerAmount)}`
+  return `${cost.status === 'planned' ? 'Planowane' : split.label}: ${primaryName} ${formatCurrency(primaryAmount)}, ${partnerName} ${formatCurrency(partnerAmount)}`
 }
 
 function costStatusLabel(cost: Pick<Cost, 'status' | 'paidDate'>) {
-  return cost.status === 'paid' ? `zapłacone: ${cost.paidDate || 'bez daty'}` : 'do zapłaty'
+  if (cost.status === 'paid') {
+    return `zapłacone: ${cost.paidDate || 'bez daty'}`
+  }
+
+  return cost.status === 'planned' ? 'planowane' : 'do zapłaty'
+}
+
+function costToggleTitle(status: PaymentStatus) {
+  if (status === 'paid') {
+    return 'Oznacz jako do zapłaty'
+  }
+
+  return status === 'planned' ? 'Oznacz jako do zapłaty' : 'Oznacz jako zapłacone'
 }
 
 const today = new Date().toISOString().slice(0, 10)
@@ -347,7 +359,7 @@ function App() {
     return readSavedSetting<TaskView>(savedTaskViewKey, 'todo', ['todo', 'done', 'all'])
   })
   const [costView, setCostView] = useState<CostView>(() => {
-    return readSavedSetting<CostView>(savedCostViewKey, 'all', ['unpaid', 'paid', 'all'])
+    return readSavedSetting<CostView>(savedCostViewKey, 'all', ['planned', 'unpaid', 'paid', 'all'])
   })
   const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null)
@@ -379,7 +391,7 @@ function App() {
     investorAmount: '',
     partnerAmount: '',
     commentHtml: '',
-    status: 'unpaid' as PaymentStatus,
+    status: 'planned' as PaymentStatus,
     paidDate: '',
   })
   const [settingsForm, setSettingsForm] = useState(defaultSettings.investors)
@@ -488,7 +500,7 @@ function App() {
       investorAmount: '',
       partnerAmount: '',
       commentHtml: '',
-      status: 'unpaid',
+      status: 'planned',
       paidDate: '',
     })
     setInvoice(undefined)
@@ -580,9 +592,11 @@ function App() {
   const summary = useMemo(() => {
     const paidCosts = state.costs.filter((cost) => cost.status === 'paid')
     const unpaidCosts = state.costs.filter((cost) => cost.status === 'unpaid')
+    const plannedCosts = state.costs.filter((cost) => cost.status === 'planned')
     const paid = paidCosts.reduce((sum, cost) => sum + cost.amount, 0)
     const unpaid = unpaidCosts.reduce((sum, cost) => sum + cost.amount, 0)
-    const total = paid + unpaid
+    const planned = plannedCosts.reduce((sum, cost) => sum + cost.amount, 0)
+    const total = paid + unpaid + planned
     const paidProgress = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0
 
     return {
@@ -1343,6 +1357,12 @@ function App() {
 
           <div className="segmented" aria-label="Filtr wydatków">
             <button
+              className={costView === 'planned' ? 'active' : ''}
+              onClick={() => setCostView('planned')}
+            >
+              Planowane
+            </button>
+            <button
               className={costView === 'unpaid' ? 'active' : ''}
               onClick={() => setCostView('unpaid')}
             >
@@ -1364,7 +1384,7 @@ function App() {
                 <button
                   className={`status-dot ${cost.status}`}
                   onClick={() => toggleCost(cost.id)}
-                  title={cost.status === 'paid' ? 'Oznacz jako do zapłaty' : 'Oznacz jako zapłacone'}
+                  title={costToggleTitle(cost.status)}
                 >
                   {cost.status === 'paid' && <Check size={16} />}
                 </button>
@@ -1710,6 +1730,7 @@ function App() {
                       setCostForm({ ...costForm, status: event.target.value as PaymentStatus })
                     }
                   >
+                    <option value="planned">Planowane</option>
                     <option value="unpaid">Do zapłaty</option>
                     <option value="paid">Zapłacone</option>
                   </select>
@@ -1733,7 +1754,7 @@ function App() {
                   <input
                     type="date"
                     value={costForm.paidDate}
-                    disabled={costForm.status === 'unpaid'}
+                    disabled={costForm.status !== 'paid'}
                     onChange={(event) => setCostForm({ ...costForm, paidDate: event.target.value })}
                   />
                 </label>

@@ -79,7 +79,7 @@ const initialState = {
       payer: 'half',
       investorShare: 50,
       partnerShare: 50,
-      status: 'unpaid',
+      status: 'planned',
       paidDate: '',
     },
   ],
@@ -198,6 +198,11 @@ function cleanTime(value, fallback = '') {
 
 function cleanPriority(value) {
   return cleanText(value, 'Normalne') === 'Pilne' ? 'Pilne' : 'Normalne'
+}
+
+function cleanCostStatus(value) {
+  const status = cleanText(value, 'planned')
+  return ['planned', 'unpaid', 'paid'].includes(status) ? status : 'planned'
 }
 
 function normalizeTask(task = {}) {
@@ -810,7 +815,7 @@ app.post('/api/costs', upload.single('invoice'), async (request, response, next)
   try {
     const state = await readState()
     const amount = Number(request.body.amount)
-    const status = request.body.status === 'paid' ? 'paid' : 'unpaid'
+    const status = cleanCostStatus(request.body.status)
     const paymentSplit = paymentSplitFromBody(request.body)
     const cost = {
       id: randomUUID(),
@@ -850,7 +855,7 @@ async function updateCost(request, response, next) {
   try {
     const state = await readState()
     const amount = Number(request.body.amount)
-    const status = request.body.status === 'paid' ? 'paid' : 'unpaid'
+    const status = cleanCostStatus(request.body.status)
     const paymentSplit = paymentSplitFromBody(request.body)
     let previousAttachment
     let updatedCost = null
@@ -913,8 +918,12 @@ app.patch('/api/costs/:id/toggle', async (request, response, next) => {
       cost.id === request.params.id
         ? {
             ...cost,
-            status: cost.status === 'paid' ? 'unpaid' : 'paid',
-            paidDate: cost.status === 'paid' ? '' : getToday(),
+            status: cleanCostStatus(cost.status) === 'planned'
+              ? 'unpaid'
+              : cleanCostStatus(cost.status) === 'paid'
+                ? 'unpaid'
+                : 'paid',
+            paidDate: cleanCostStatus(cost.status) === 'unpaid' ? getToday() : '',
           }
         : cost,
     )

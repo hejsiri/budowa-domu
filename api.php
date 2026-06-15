@@ -85,7 +85,7 @@ $initialState = [
             'payer' => 'half',
             'investorShare' => 50,
             'partnerShare' => 50,
-            'status' => 'unpaid',
+            'status' => 'planned',
             'paidDate' => '',
         ],
     ],
@@ -323,6 +323,12 @@ function cleanTime($value, string $fallback = ''): string
 function cleanPriority($value): string
 {
     return cleanText($value ?? '', 'Normalne') === 'Pilne' ? 'Pilne' : 'Normalne';
+}
+
+function cleanCostStatus($value): string
+{
+    $status = cleanText($value ?? '', 'planned');
+    return in_array($status, ['planned', 'unpaid', 'paid'], true) ? $status : 'planned';
 }
 
 function normalizeTask($task): array
@@ -808,7 +814,7 @@ try {
     if ($resource === 'costs' && $method === 'POST') {
         $amount = (float)($_POST['amount'] ?? 0);
         $title = cleanText($_POST['title'] ?? '');
-        $status = ($_POST['status'] ?? '') === 'paid' ? 'paid' : 'unpaid';
+        $status = cleanCostStatus($_POST['status'] ?? '');
 
         if ($title === '' || $amount < 0) {
             respond(['message' => 'Podaj opis i prawidlowa kwote kosztu.'], 400);
@@ -895,9 +901,17 @@ try {
     if ($resource === 'costs' && $method === 'PATCH' && $action === 'toggle') {
         foreach ($state['costs'] as &$cost) {
             if (($cost['id'] ?? '') === $id) {
-                $isPaid = ($cost['status'] ?? 'unpaid') === 'paid';
-                $cost['status'] = $isPaid ? 'unpaid' : 'paid';
-                $cost['paidDate'] = $isPaid ? '' : date('Y-m-d');
+                $currentStatus = cleanCostStatus($cost['status'] ?? '');
+                if ($currentStatus === 'planned') {
+                    $cost['status'] = 'unpaid';
+                    $cost['paidDate'] = '';
+                } elseif ($currentStatus === 'paid') {
+                    $cost['status'] = 'unpaid';
+                    $cost['paidDate'] = '';
+                } else {
+                    $cost['status'] = 'paid';
+                    $cost['paidDate'] = date('Y-m-d');
+                }
             }
         }
         unset($cost);
