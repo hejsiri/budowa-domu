@@ -25,6 +25,8 @@ const initialState = {
       area: 'Stan surowy',
       priority: 'Pilne',
       dueDate: '2026-06-18',
+      startTime: '09:00',
+      endTime: '10:00',
       comment: '',
       attachments: [],
       status: 'todo',
@@ -35,6 +37,8 @@ const initialState = {
       area: 'Materialy',
       priority: 'Normalne',
       dueDate: '2026-06-21',
+      startTime: '09:00',
+      endTime: '10:00',
       comment: '',
       attachments: [],
       status: 'todo',
@@ -45,6 +49,8 @@ const initialState = {
       area: 'Dokumenty',
       priority: 'Normalne',
       dueDate: '2026-06-10',
+      startTime: '09:00',
+      endTime: '10:00',
       comment: '',
       attachments: [],
       status: 'done',
@@ -81,6 +87,7 @@ const initialState = {
       primary: 'Ja',
       partner: 'Drugi inwestor',
     },
+    calendarToken: randomUUID(),
   },
 }
 
@@ -133,7 +140,18 @@ async function readState() {
   await ensureStorage()
   const content = await fs.readFile(dataFile, 'utf8')
   const state = JSON.parse(content)
-  return { ...state, settings: normalizeSettings(state.settings) }
+  const hadCalendarToken = Boolean(cleanText(state.settings?.calendarToken))
+  const nextState = {
+    ...state,
+    tasks: Array.isArray(state.tasks) ? state.tasks.map(normalizeTask) : [],
+    settings: normalizeSettings(state.settings),
+  }
+
+  if (!hadCalendarToken) {
+    await writeState(nextState)
+  }
+
+  return nextState
 }
 
 async function writeState(state) {
@@ -151,7 +169,95 @@ function normalizeSettings(settings = {}) {
       primary: cleanText(settings.investors?.primary, 'Ja'),
       partner: cleanText(settings.investors?.partner, 'Drugi inwestor'),
     },
+    calendarToken: cleanText(settings.calendarToken, randomUUID()),
   }
+}
+
+function cleanTime(value, fallback = '') {
+  const time = String(value || '').trim()
+  return /^\d{2}:\d{2}$/.test(time) ? time : fallback
+}
+
+function normalizeTask(task = {}) {
+  return {
+    ...task,
+    id: cleanText(task.id, randomUUID()),
+    title: cleanText(task.title),
+    area: cleanText(task.area, 'Inne'),
+    priority: cleanText(task.priority, 'Normalne'),
+    dueDate: cleanText(task.dueDate),
+    startTime: cleanTime(task.startTime, '09:00'),
+    endTime: cleanTime(task.endTime, '10:00'),
+    comment: cleanText(task.comment),
+    attachments: Array.isArray(task.attachments) ? task.attachments : [],
+    status: task.status === 'done' ? 'done' : 'todo',
+  }
+}
+
+function calendarDate(date, time) {
+  return `${date}T${time}00`.replace(/[-:]/g, '')
+}
+
+function calendarEndDate(date, start, end) {
+  if (end > start) {
+    return calendarDate(date, end)
+  }
+
+  const [year, month, day] = date.split('-').map(Number)
+  const [startHour, startMinute] = start.split(':').map(Number)
+  const endMinutes = startHour * 60 + startMinute + 60
+  const endDate = new Date(Date.UTC(year, month - 1, day + Math.floor(endMinutes / 1440)))
+  const datePart = endDate.toISOString().slice(0, 10)
+  const hour = String(Math.floor((endMinutes % 1440) / 60)).padStart(2, '0')
+  const minute = String(endMinutes % 60).padStart(2, '0')
+  return calendarDate(datePart, `${hour}:${minute}`)
+}
+
+function escapeCalendarText(text) {
+  return String(text || '')
+    .replaceAll('\\', '\\\\')
+    .replaceAll(/\r\n|\n|\r/g, '\\n')
+    .replaceAll(';', '\\;')
+    .replaceAll(',', '\\,')
+}
+
+function renderCalendar(state) {
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Budowa domu//Zadania//PL',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Budowa domu',
+    'X-WR-TIMEZONE:Europe/Warsaw',
+  ]
+
+  for (const task of state.tasks) {
+    if (!task.dueDate) {
+      continue
+    }
+
+    const start = cleanTime(task.startTime, '09:00')
+    const end = cleanTime(task.endTime, '10:00')
+    const description = [task.area, task.comment].filter(Boolean).join('\n')
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${escapeCalendarText(task.id)}@budowa-domu`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`,
+      `DTSTART;TZID=Europe/Warsaw:${calendarDate(task.dueDate, start)}`,
+      `DTEND;TZID=Europe/Warsaw:${calendarEndDate(task.dueDate, start, end)}`,
+      `SUMMARY:${escapeCalendarText(task.title)}`,
+    )
+
+    if (description) {
+      lines.push(`DESCRIPTION:${escapeCalendarText(description)}`)
+    }
+
+    lines.push('STATUS:CONFIRMED', 'END:VEVENT')
+  }
+
+  lines.push('END:VCALENDAR')
+  return `${lines.join('\r\n')}\r\n`
 }
 
 function getToday() {
@@ -454,6 +560,23 @@ app.post('/api/auth/logout', async (request, response, next) => {
   }
 })
 
+app.get('/api/calendar', async (request, response, next) => {
+  try {
+    const state = await readState()
+    const token = cleanText(request.query.token)
+    if (!token || token !== state.settings.calendarToken) {
+      response.status(403).json({ message: 'Niepoprawny link kalendarza.' })
+      return
+    }
+
+    response.setHeader('Content-Type', 'text/calendar; charset=utf-8')
+    response.setHeader('Content-Disposition', 'inline; filename="budowa-domu.ics"')
+    response.send(renderCalendar(state))
+  } catch (error) {
+    next(error)
+  }
+})
+
 app.use('/api', requireAuth)
 
 app.get('/api/state', async (_request, response, next) => {
@@ -467,7 +590,7 @@ app.get('/api/state', async (_request, response, next) => {
 app.post('/api/settings', async (request, response, next) => {
   try {
     const state = await readState()
-    state.settings = normalizeSettings(request.body)
+    state.settings = normalizeSettings({ ...state.settings, ...request.body })
     await writeState(state)
     response.json(state)
   } catch (error) {
@@ -505,6 +628,8 @@ app.post('/api/tasks', upload.array('attachments[]', 8), async (request, respons
       area: cleanText(request.body.area, 'Stan surowy'),
       priority: cleanText(request.body.priority, 'Normalne'),
       dueDate: cleanText(request.body.dueDate),
+      startTime: cleanTime(request.body.startTime, '09:00'),
+      endTime: cleanTime(request.body.endTime, '10:00'),
       comment: cleanText(request.body.comment),
       attachments: (request.files || []).map(fileAttachment),
       status: 'todo',
@@ -540,6 +665,8 @@ app.post('/api/tasks/:id', upload.array('attachments[]', 8), async (request, res
         area: cleanText(request.body.area, 'Stan surowy'),
         priority: cleanText(request.body.priority, 'Normalne'),
         dueDate: cleanText(request.body.dueDate),
+        startTime: cleanTime(request.body.startTime, '09:00'),
+        endTime: cleanTime(request.body.endTime, '10:00'),
         comment: cleanText(request.body.comment),
         attachments: [...(task.attachments || []), ...attachments],
       }
@@ -590,6 +717,8 @@ app.patch('/api/tasks/:id', async (request, response, next) => {
         area: cleanText(request.body.area, 'Stan surowy'),
         priority: cleanText(request.body.priority, 'Normalne'),
         dueDate: cleanText(request.body.dueDate),
+        startTime: cleanTime(request.body.startTime, '09:00'),
+        endTime: cleanTime(request.body.endTime, '10:00'),
         comment: cleanText(request.body.comment),
       }
 

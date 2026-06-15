@@ -31,6 +31,8 @@ $initialState = [
             'area' => 'Stan surowy',
             'priority' => 'Pilne',
             'dueDate' => '2026-06-18',
+            'startTime' => '09:00',
+            'endTime' => '10:00',
             'comment' => '',
             'attachments' => [],
             'status' => 'todo',
@@ -41,6 +43,8 @@ $initialState = [
             'area' => 'Materialy',
             'priority' => 'Normalne',
             'dueDate' => '2026-06-21',
+            'startTime' => '09:00',
+            'endTime' => '10:00',
             'comment' => '',
             'attachments' => [],
             'status' => 'todo',
@@ -51,6 +55,8 @@ $initialState = [
             'area' => 'Dokumenty',
             'priority' => 'Normalne',
             'dueDate' => '2026-06-10',
+            'startTime' => '09:00',
+            'endTime' => '10:00',
             'comment' => '',
             'attachments' => [],
             'status' => 'done',
@@ -87,6 +93,7 @@ $initialState = [
             'primary' => 'Ja',
             'partner' => 'Drugi inwestor',
         ],
+        'calendarToken' => uuid(),
     ],
 ];
 
@@ -258,7 +265,12 @@ function readState(string $dataFile): array
         $state = ['tasks' => [], 'costs' => []];
     }
 
+    $hadCalendarToken = cleanText($state['settings']['calendarToken'] ?? '') !== '';
     $state['settings'] = normalizeSettings($state['settings'] ?? []);
+    $state['tasks'] = array_map('normalizeTask', is_array($state['tasks'] ?? null) ? $state['tasks'] : []);
+    if (!$hadCalendarToken) {
+        writeState($dataFile, $state);
+    }
     return $state;
 }
 
@@ -276,13 +288,107 @@ function cleanText($value, string $fallback = ''): string
 function normalizeSettings($settings): array
 {
     $investors = is_array($settings['investors'] ?? null) ? $settings['investors'] : [];
+    $calendarToken = cleanText($settings['calendarToken'] ?? '');
 
     return [
         'investors' => [
             'primary' => cleanText($investors['primary'] ?? '', 'Ja'),
             'partner' => cleanText($investors['partner'] ?? '', 'Drugi inwestor'),
         ],
+        'calendarToken' => $calendarToken !== '' ? $calendarToken : uuid(),
     ];
+}
+
+function cleanTime($value, string $fallback = ''): string
+{
+    $time = trim((string)($value ?? ''));
+    return preg_match('/^\d{2}:\d{2}$/', $time) === 1 ? $time : $fallback;
+}
+
+function normalizeTask($task): array
+{
+    $task = is_array($task) ? $task : [];
+    $task['id'] = cleanText($task['id'] ?? '', uuid());
+    $task['title'] = cleanText($task['title'] ?? '');
+    $task['area'] = cleanText($task['area'] ?? '', 'Inne');
+    $task['priority'] = cleanText($task['priority'] ?? '', 'Normalne');
+    $task['dueDate'] = cleanText($task['dueDate'] ?? '');
+    $task['startTime'] = cleanTime($task['startTime'] ?? '', '09:00');
+    $task['endTime'] = cleanTime($task['endTime'] ?? '', '10:00');
+    $task['comment'] = cleanText($task['comment'] ?? '');
+    $task['attachments'] = is_array($task['attachments'] ?? null) ? $task['attachments'] : [];
+    $task['status'] = ($task['status'] ?? 'todo') === 'done' ? 'done' : 'todo';
+    return $task;
+}
+
+function calendarDate(string $date, string $time): string
+{
+    return str_replace(['-', ':'], '', $date . 'T' . $time . '00');
+}
+
+function calendarEndDate(string $date, string $start, string $end): string
+{
+    if ($end > $start) {
+        return calendarDate($date, $end);
+    }
+
+    $dateTime = DateTimeImmutable::createFromFormat('Y-m-d H:i', $date . ' ' . $start, new DateTimeZone('Europe/Warsaw'));
+    if (!$dateTime) {
+        return calendarDate($date, $start);
+    }
+
+    return $dateTime->modify('+1 hour')->format('Ymd\THis');
+}
+
+function escapeCalendarText(string $text): string
+{
+    return str_replace(
+        ["\\", "\r\n", "\n", "\r", ';', ','],
+        ["\\\\", "\\n", "\\n", "\\n", "\\;", "\\,"],
+        $text
+    );
+}
+
+function renderCalendar(array $state)
+{
+    header('Content-Type: text/calendar; charset=utf-8');
+    header('Content-Disposition: inline; filename="budowa-domu.ics"');
+
+    $lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Budowa domu//Zadania//PL',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'X-WR-CALNAME:Budowa domu',
+        'X-WR-TIMEZONE:Europe/Warsaw',
+    ];
+
+    foreach ($state['tasks'] as $task) {
+        if (($task['dueDate'] ?? '') === '') {
+            continue;
+        }
+
+        $start = cleanTime($task['startTime'] ?? '', '09:00');
+        $end = cleanTime($task['endTime'] ?? '', '10:00');
+
+        $description = trim(($task['area'] ?? '') . "\n" . ($task['comment'] ?? ''));
+        $lines[] = 'BEGIN:VEVENT';
+        $lines[] = 'UID:' . escapeCalendarText((string)$task['id']) . '@budowa-domu';
+        $lines[] = 'DTSTAMP:' . gmdate('Ymd\THis\Z');
+        $lines[] = 'DTSTART;TZID=Europe/Warsaw:' . calendarDate((string)$task['dueDate'], $start);
+        $lines[] = 'DTEND;TZID=Europe/Warsaw:' . calendarEndDate((string)$task['dueDate'], $start, $end);
+        $lines[] = 'SUMMARY:' . escapeCalendarText((string)$task['title']);
+        if ($description !== '') {
+            $lines[] = 'DESCRIPTION:' . escapeCalendarText($description);
+        }
+        $lines[] = 'STATUS:CONFIRMED';
+        $lines[] = 'END:VEVENT';
+    }
+
+    $lines[] = 'END:VCALENDAR';
+    echo implode("\r\n", $lines) . "\r\n";
+    exit;
 }
 
 function cleanPayer($value): string
@@ -502,13 +608,23 @@ try {
         respond(['authenticated' => false]);
     }
 
+    if ($resource === 'calendar' && $method === 'GET') {
+        $token = cleanText($_GET['token'] ?? '');
+        $calendarToken = cleanText($state['settings']['calendarToken'] ?? '');
+        if ($token === '' || $calendarToken === '' || !hash_equals($calendarToken, $token)) {
+            respond(['message' => 'Niepoprawny link kalendarza.'], 403);
+        }
+
+        renderCalendar($state);
+    }
+
     if (!currentUser($sessionsFile)) {
         respond(['message' => 'Sesja wygasla. Zaloguj sie ponownie.'], 401);
     }
 
     if ($resource === 'settings' && $method === 'POST') {
         $body = readJsonBody();
-        $state['settings'] = normalizeSettings($body);
+        $state['settings'] = normalizeSettings(array_merge($state['settings'] ?? [], $body));
         writeState($dataFile, $state);
         respond($state);
     }
@@ -546,6 +662,8 @@ try {
                     $task['area'] = cleanText($_POST['area'] ?? '', 'Inne');
                     $task['priority'] = cleanText($_POST['priority'] ?? '', 'Normalne');
                     $task['dueDate'] = cleanText($_POST['dueDate'] ?? '');
+                    $task['startTime'] = cleanTime($_POST['startTime'] ?? '', '09:00');
+                    $task['endTime'] = cleanTime($_POST['endTime'] ?? '', '10:00');
                     $task['comment'] = cleanText($_POST['comment'] ?? '');
                     $task['attachments'] = array_values(array_merge($task['attachments'] ?? [], $attachments));
                 }
@@ -562,6 +680,8 @@ try {
             'area' => cleanText($_POST['area'] ?? '', 'Inne'),
             'priority' => cleanText($_POST['priority'] ?? '', 'Normalne'),
             'dueDate' => cleanText($_POST['dueDate'] ?? ''),
+            'startTime' => cleanTime($_POST['startTime'] ?? '', '09:00'),
+            'endTime' => cleanTime($_POST['endTime'] ?? '', '10:00'),
             'comment' => cleanText($_POST['comment'] ?? ''),
             'attachments' => $attachments,
             'status' => 'todo',
@@ -598,6 +718,8 @@ try {
                 $task['area'] = cleanText($body['area'] ?? '', 'Inne');
                 $task['priority'] = cleanText($body['priority'] ?? '', 'Normalne');
                 $task['dueDate'] = cleanText($body['dueDate'] ?? '');
+                $task['startTime'] = cleanTime($body['startTime'] ?? '', '09:00');
+                $task['endTime'] = cleanTime($body['endTime'] ?? '', '10:00');
             }
         }
         unset($task);

@@ -37,6 +37,8 @@ type Task = {
   area: string
   priority: string
   dueDate: string
+  startTime?: string
+  endTime?: string
   status: TaskStatus
   comment?: string
   attachments?: Attachment[]
@@ -67,6 +69,7 @@ type SettingsState = {
     primary: string
     partner: string
   }
+  calendarToken?: string
 }
 
 type AppState = {
@@ -80,6 +83,7 @@ const defaultSettings: SettingsState = {
     primary: 'Ja',
     partner: 'Drugi inwestor',
   },
+  calendarToken: '',
 }
 
 const emptyState: AppState = { tasks: [], costs: [], settings: defaultSettings }
@@ -102,6 +106,22 @@ function formatCurrency(value: number) {
 
 function formatInteger(value: number) {
   return formatWithThousands(Math.round(value))
+}
+
+function formatTaskDateTime(task: Pick<Task, 'dueDate' | 'startTime' | 'endTime'>) {
+  if (!task.dueDate) {
+    return 'bez daty'
+  }
+
+  if (task.startTime && task.endTime) {
+    return `${task.dueDate}, ${task.startTime}-${task.endTime}`
+  }
+
+  if (task.startTime) {
+    return `${task.dueDate}, od ${task.startTime}`
+  }
+
+  return task.dueDate
 }
 
 function normalizeShare(value: number) {
@@ -167,6 +187,15 @@ function attachmentHref(path: string) {
     : `api.php?resource=file&path=${encodeURIComponent(cleanPath)}`
 }
 
+function calendarHref(token?: string) {
+  if (!token) {
+    return ''
+  }
+
+  const path = isDevServer ? `/api/calendar?token=${encodeURIComponent(token)}` : `api.php?resource=calendar&token=${encodeURIComponent(token)}`
+  return new URL(path, window.location.href).toString()
+}
+
 function isImageAttachment(attachment: Attachment) {
   return attachment.mimeType.startsWith('image/')
 }
@@ -213,6 +242,8 @@ function App() {
     area: 'Fundamenty',
     priority: 'Normalne',
     dueDate: today,
+    startTime: '09:00',
+    endTime: '10:00',
     comment: '',
   })
   const [costForm, setCostForm] = useState({
@@ -228,6 +259,7 @@ function App() {
   const [settingsForm, setSettingsForm] = useState(defaultSettings.investors)
 
   const settings = state.settings || defaultSettings
+  const calendarUrl = calendarHref(settings.calendarToken)
 
   async function refreshState() {
     setIsLoading(true)
@@ -292,6 +324,8 @@ function App() {
       area: 'Fundamenty',
       priority: 'Normalne',
       dueDate: today,
+      startTime: '09:00',
+      endTime: '10:00',
       comment: '',
     })
     setTaskAttachments([])
@@ -329,6 +363,8 @@ function App() {
       area: task.area,
       priority: task.priority,
       dueDate: task.dueDate,
+      startTime: task.startTime || '09:00',
+      endTime: task.endTime || '10:00',
       comment: task.comment || '',
     })
     setTaskAttachments([])
@@ -414,6 +450,8 @@ function App() {
     body.append('area', taskForm.area)
     body.append('priority', taskForm.priority)
     body.append('dueDate', taskForm.dueDate)
+    body.append('startTime', taskForm.startTime)
+    body.append('endTime', taskForm.endTime)
     body.append('comment', taskForm.comment)
     taskAttachments.forEach((file) => body.append('attachments[]', file))
 
@@ -855,7 +893,7 @@ function App() {
                     <span className={`badge ${task.priority.toLowerCase()}`}>{task.priority}</span>
                   </div>
                   <p>
-                    {task.area} · termin {task.dueDate || 'bez daty'}
+                    {task.area} · termin {formatTaskDateTime(task)}
                   </p>
                   {task.comment && <p className="item-comment">{task.comment}</p>}
                   {task.attachments && task.attachments.length > 0 && (
@@ -1048,6 +1086,12 @@ function App() {
                     placeholder="np. Anna"
                   />
                 </label>
+                {calendarUrl && (
+                  <label className="wide">
+                    <span>Link kalendarza</span>
+                    <input value={calendarUrl} readOnly onFocus={(event) => event.currentTarget.select()} />
+                  </label>
+                )}
                 <div className="modal-actions">
                   <button type="button" className="secondary-action" onClick={closeModal}>
                     Anuluj
@@ -1101,6 +1145,22 @@ function App() {
                     type="date"
                     value={taskForm.dueDate}
                     onChange={(event) => setTaskForm({ ...taskForm, dueDate: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>Początek</span>
+                  <input
+                    type="time"
+                    value={taskForm.startTime}
+                    onChange={(event) => setTaskForm({ ...taskForm, startTime: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>Koniec</span>
+                  <input
+                    type="time"
+                    value={taskForm.endTime}
+                    onChange={(event) => setTaskForm({ ...taskForm, endTime: event.target.value })}
                   />
                 </label>
                 <label className="wide">

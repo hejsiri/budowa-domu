@@ -8,7 +8,9 @@
       "area": "Dokumenty",
       "priority": "Pilne",
       "dueDate": "2026-06-15",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "08:00",
+      "endTime": "09:00"
     },
     {
       "comment": "",
@@ -18,7 +20,9 @@
       "area": "Fundamenty",
       "priority": "Pilne",
       "dueDate": "2026-06-16",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "09:00",
+      "endTime": "10:00"
     },
     {
       "comment": "",
@@ -28,7 +32,9 @@
       "area": "Stan surowy",
       "priority": "Normalne",
       "dueDate": "2026-06-17",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "10:00",
+      "endTime": "11:00"
     },
     {
       "comment": "",
@@ -38,7 +44,9 @@
       "area": "Fundamenty",
       "priority": "Normalne",
       "dueDate": "2026-06-18",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "11:00",
+      "endTime": "12:00"
     },
     {
       "comment": "",
@@ -48,7 +56,9 @@
       "area": "Sprzet",
       "priority": "Niskie",
       "dueDate": "2026-06-19",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "12:00",
+      "endTime": "13:00"
     },
     {
       "comment": "",
@@ -58,7 +68,9 @@
       "area": "Fundamenty",
       "priority": "Pilne",
       "dueDate": "2026-06-20",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "08:00",
+      "endTime": "09:00"
     },
     {
       "comment": "",
@@ -68,7 +80,9 @@
       "area": "Materialy",
       "priority": "Normalne",
       "dueDate": "2026-06-21",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "09:00",
+      "endTime": "10:00"
     },
     {
       "comment": "",
@@ -78,7 +92,9 @@
       "area": "Stan surowy",
       "priority": "Normalne",
       "dueDate": "2026-06-22",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "10:00",
+      "endTime": "11:00"
     },
     {
       "comment": "",
@@ -88,7 +104,9 @@
       "area": "Materialy",
       "priority": "Normalne",
       "dueDate": "2026-06-23",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "11:00",
+      "endTime": "12:00"
     },
     {
       "comment": "",
@@ -98,7 +116,9 @@
       "area": "Materialy",
       "priority": "Pilne",
       "dueDate": "2026-06-24",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "12:00",
+      "endTime": "13:00"
     },
     {
       "comment": "",
@@ -108,7 +128,9 @@
       "area": "Instalacje",
       "priority": "Niskie",
       "dueDate": "2026-06-25",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "08:00",
+      "endTime": "09:00"
     },
     {
       "comment": "",
@@ -118,7 +140,9 @@
       "area": "Dokumenty",
       "priority": "Niskie",
       "dueDate": "2026-06-26",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "09:00",
+      "endTime": "10:00"
     },
     {
       "comment": "",
@@ -128,7 +152,9 @@
       "area": "Dokumenty",
       "priority": "Normalne",
       "dueDate": "2026-06-27",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "10:00",
+      "endTime": "11:00"
     },
     {
       "comment": "",
@@ -138,7 +164,9 @@
       "area": "Sciany",
       "priority": "Normalne",
       "dueDate": "2026-06-28",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "11:00",
+      "endTime": "12:00"
     },
     {
       "comment": "",
@@ -148,7 +176,9 @@
       "area": "Dokumenty",
       "priority": "Niskie",
       "dueDate": "2026-06-29",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "12:00",
+      "endTime": "13:00"
     },
     {
       "comment": "",
@@ -158,7 +188,9 @@
       "area": "Fundamenty",
       "priority": "Pilne",
       "dueDate": "2026-06-18",
-      "status": "todo"
+      "status": "todo",
+      "startTime": "08:00",
+      "endTime": "09:00"
     },
     {
       "comment": "",
@@ -168,7 +200,9 @@
       "area": "Dokumenty",
       "priority": "Normalne",
       "dueDate": "2026-06-10",
-      "status": "done"
+      "status": "done",
+      "startTime": "09:00",
+      "endTime": "10:00"
     }
   ],
   "costs": [
@@ -213,6 +247,7 @@
     "investors": {
       "primary": "Ja",
       "partner": "Drugi inwestor"
-    }
+    },
+    "calendarToken": "example-calendar-token"
   }
 }
