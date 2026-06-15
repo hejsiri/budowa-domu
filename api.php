@@ -285,6 +285,15 @@ function cleanText($value, string $fallback = ''): string
     return $text !== '' ? $text : $fallback;
 }
 
+function cleanRichText($value): string
+{
+    $html = substr((string)($value ?? ''), 0, 5000);
+    $html = preg_replace('/<\s*(script|style)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html) ?? '';
+    $html = strip_tags($html, '<b><strong><i><em><u><br><p><ul><ol><li>');
+    $html = preg_replace('/<([a-z][a-z0-9]*)\b[^>]*>/i', '<$1>', $html) ?? '';
+    return trim($html);
+}
+
 function normalizeSettings($settings): array
 {
     $investors = is_array($settings['investors'] ?? null) ? $settings['investors'] : [];
@@ -795,6 +804,7 @@ try {
                     $cost['payer'] = $paymentSplit['payer'];
                     $cost['investorShare'] = $paymentSplit['investorShare'];
                     $cost['partnerShare'] = $paymentSplit['partnerShare'];
+                    $cost['commentHtml'] = cleanRichText($_POST['commentHtml'] ?? '');
                     $cost['status'] = $status;
                     $cost['paidDate'] = $status === 'paid' ? cleanText($_POST['paidDate'] ?? '', date('Y-m-d')) : '';
 
@@ -826,6 +836,7 @@ try {
             'payer' => $paymentSplit['payer'],
             'investorShare' => $paymentSplit['investorShare'],
             'partnerShare' => $paymentSplit['partnerShare'],
+            'commentHtml' => cleanRichText($_POST['commentHtml'] ?? ''),
             'status' => $status,
             'paidDate' => $status === 'paid' ? cleanText($_POST['paidDate'] ?? '', date('Y-m-d')) : '',
         ];

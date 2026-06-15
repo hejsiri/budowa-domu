@@ -613,6 +613,30 @@ textarea {
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
+.rich-editor {
+  width: 100%;
+  min-height: 112px;
+  box-sizing: border-box;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 12px;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 0.87rem;
+  font-weight: 600;
+  line-height: 1.45;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.rich-editor:empty::before,
+.rich-editor[data-empty='true']::before {
+  color: #98a4ad;
+  content: 'Wklej lub wpisz notatke';
+  pointer-events: none;
+}
+
 textarea {
   min-height: 104px;
   padding-top: 11px;
@@ -635,7 +659,8 @@ select {
 
 input:focus,
 select:focus,
-textarea:focus {
+textarea:focus,
+.rich-editor:focus {
   border-color: var(--accent-2);
   background: #ffffff;
   box-shadow: 0 0 0 4px rgba(37, 99, 135, 0.14);
@@ -798,6 +823,26 @@ input:disabled {
   font-weight: 650;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.rich-comment {
+  margin-top: 9px;
+  white-space: normal;
+}
+
+.rich-comment p,
+.rich-comment ul,
+.rich-comment ol {
+  margin: 6px 0 0;
+}
+
+.rich-comment ul,
+.rich-comment ol {
+  padding-left: 18px;
+}
+
+.rich-comment li {
+  margin-top: 3px;
 }
 
 .empty {

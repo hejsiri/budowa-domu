@@ -163,6 +163,19 @@ function cleanText(value, fallback = '') {
   return String(value || fallback).trim()
 }
 
+function cleanRichText(value) {
+  return String(value || '')
+    .slice(0, 5000)
+    .replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (match, tag) => {
+      const cleanTag = String(tag).toLowerCase()
+      return ['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'ul', 'ol', 'li'].includes(cleanTag)
+        ? `<${match.startsWith('</') ? '/' : ''}${cleanTag}>`
+        : ''
+    })
+    .trim()
+}
+
 function normalizeSettings(settings = {}) {
   return {
     investors: {
@@ -769,6 +782,7 @@ app.post('/api/costs', upload.single('invoice'), async (request, response, next)
       payer: paymentSplit.payer,
       investorShare: paymentSplit.investorShare,
       partnerShare: paymentSplit.partnerShare,
+      commentHtml: cleanRichText(request.body.commentHtml),
       status,
       paidDate: status === 'paid' ? cleanText(request.body.paidDate, getToday()) : '',
       attachment: request.file
@@ -817,6 +831,7 @@ async function updateCost(request, response, next) {
         payer: paymentSplit.payer,
         investorShare: paymentSplit.investorShare,
         partnerShare: paymentSplit.partnerShare,
+        commentHtml: cleanRichText(request.body.commentHtml),
         status,
         paidDate: status === 'paid' ? cleanText(request.body.paidDate, getToday()) : '',
       }

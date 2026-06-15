@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent, FormEvent } from 'react'
 import {
   BanknoteArrowDown,
@@ -59,6 +59,7 @@ type Cost = {
   payer?: CostPayer
   investorShare?: number
   partnerShare?: number
+  commentHtml?: string
   status: PaymentStatus
   paidDate: string
   attachment?: Attachment
@@ -204,6 +205,39 @@ function taskPriority(priority: string) {
   return priority === 'Pilne' ? 'Pilne' : 'Normalne'
 }
 
+function sanitizeRichTextHtml(html: string) {
+  const template = document.createElement('template')
+  template.innerHTML = html.slice(0, 5000)
+  const allowedTags = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'P', 'DIV', 'UL', 'OL', 'LI'])
+
+  function cleanNode(node: Node): Node {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.textContent || '')
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return document.createDocumentFragment()
+    }
+
+    const element = node as HTMLElement
+    const fragment = document.createDocumentFragment()
+
+    if (!allowedTags.has(element.tagName)) {
+      element.childNodes.forEach((child) => fragment.append(cleanNode(child)))
+      return fragment
+    }
+
+    const cleanTag = element.tagName === 'DIV' ? 'P' : element.tagName.toLowerCase()
+    const cleanElement = document.createElement(cleanTag)
+    element.childNodes.forEach((child) => cleanElement.append(cleanNode(child)))
+    return cleanElement
+  }
+
+  const wrapper = document.createElement('div')
+  template.content.childNodes.forEach((node) => wrapper.append(cleanNode(node)))
+  return wrapper.textContent?.trim() ? wrapper.innerHTML : ''
+}
+
 async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: 'same-origin', ...options })
 
@@ -244,6 +278,7 @@ function App() {
   const [taskAttachments, setTaskAttachments] = useState<File[]>([])
   const [taskDropActive, setTaskDropActive] = useState(false)
   const [invoiceDropActive, setInvoiceDropActive] = useState(false)
+  const costCommentRef = useRef<HTMLDivElement | null>(null)
   const [taskForm, setTaskForm] = useState({
     title: '',
     area: 'Fundamenty',
@@ -262,6 +297,7 @@ function App() {
     investorShare: '100',
     investorAmount: '',
     partnerAmount: '',
+    commentHtml: '',
     status: 'unpaid' as PaymentStatus,
     paidDate: '',
   })
@@ -351,6 +387,7 @@ function App() {
       investorShare: '100',
       investorAmount: '',
       partnerAmount: '',
+      commentHtml: '',
       status: 'unpaid',
       paidDate: '',
     })
@@ -408,6 +445,7 @@ function App() {
       investorShare: String(split.investorShare),
       investorAmount: investorAmount ? String(Math.round(investorAmount)) : '',
       partnerAmount: partnerAmount ? String(Math.round(partnerAmount)) : '',
+      commentHtml: sanitizeRichTextHtml(cost.commentHtml || ''),
       status: cost.status,
       paidDate: cost.paidDate,
     })
@@ -649,6 +687,7 @@ function App() {
     body.append('payer', costForm.payer)
     body.append('investorShare', String(investorShare))
     body.append('partnerShare', String(partnerShare))
+    body.append('commentHtml', sanitizeRichTextHtml(costCommentRef.current?.innerHTML || costForm.commentHtml))
     body.append('status', costForm.status)
     body.append('paidDate', costForm.paidDate)
     if (invoice) {
@@ -1166,6 +1205,12 @@ function App() {
                     , {settings.investors.partner}{' '}
                     {formatCurrency((cost.amount * costSplit(cost, settings).partnerShare) / 100)}
                   </p>
+                  {cost.commentHtml && (
+                    <div
+                      className="item-comment rich-comment"
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(cost.commentHtml) }}
+                    />
+                  )}
                   {cost.attachment && (
                     <a
                       className="attachment-link"
@@ -1494,6 +1539,27 @@ function App() {
                     />
                   </label>
                 )}
+                <label className="wide">
+                  <span>Notatka</span>
+                  <div
+                    ref={costCommentRef}
+                    className="rich-editor"
+                    contentEditable
+                    data-empty={!costForm.commentHtml}
+                    key={`${editingCostId || 'new'}-cost-comment`}
+                    onBlur={(event) => {
+                      const commentHtml = sanitizeRichTextHtml(event.currentTarget.innerHTML)
+                      event.currentTarget.innerHTML = commentHtml
+                      event.currentTarget.dataset.empty = commentHtml ? 'false' : 'true'
+                      setCostForm({ ...costForm, commentHtml })
+                    }}
+                    onInput={(event) => {
+                      event.currentTarget.dataset.empty = event.currentTarget.textContent?.trim() ? 'false' : 'true'
+                    }}
+                    suppressContentEditableWarning
+                    dangerouslySetInnerHTML={{ __html: costForm.commentHtml }}
+                  />
+                </label>
                 <label
                   className={`file-input wide drop-input ${invoiceDropActive ? 'is-dragging' : ''}`}
                   onDragOver={(event) => {
