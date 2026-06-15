@@ -167,6 +167,10 @@ function attachmentHref(path: string) {
     : `api.php?resource=file&path=${encodeURIComponent(cleanPath)}`
 }
 
+function isImageAttachment(attachment: Attachment) {
+  return attachment.mimeType.startsWith('image/')
+}
+
 async function requestJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: 'same-origin', ...options })
 
@@ -850,15 +854,27 @@ function App() {
                   {task.attachments && task.attachments.length > 0 && (
                     <div className="attachment-list">
                       {task.attachments.map((attachment) => (
-                        <a
-                          className="attachment-link"
-                          href={attachmentHref(attachment.path)}
-                          target="_blank"
-                          key={attachment.path}
-                        >
-                          <FileText size={16} />
-                          {attachment.name}
-                        </a>
+                        isImageAttachment(attachment) ? (
+                          <a
+                            className="attachment-thumb"
+                            href={attachmentHref(attachment.path)}
+                            target="_blank"
+                            key={attachment.path}
+                            title={attachment.name}
+                          >
+                            <img src={attachmentHref(attachment.path)} alt={attachment.name} loading="lazy" />
+                          </a>
+                        ) : (
+                          <a
+                            className="attachment-link"
+                            href={attachmentHref(attachment.path)}
+                            target="_blank"
+                            key={attachment.path}
+                          >
+                            <FileText size={16} />
+                            {attachment.name}
+                          </a>
+                        )
                       ))}
                     </div>
                   )}
