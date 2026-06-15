@@ -13,6 +13,7 @@ import {
   Paperclip,
   Plus,
   Settings,
+  StickyNote,
   SquarePen,
   Trash,
   X,
@@ -272,6 +273,7 @@ function App() {
   const [costView, setCostView] = useState<PaymentStatus | 'all'>('all')
   const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null)
+  const [costNotePreview, setCostNotePreview] = useState<Pick<Cost, 'title' | 'commentHtml'> | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<File | undefined>()
@@ -354,6 +356,7 @@ function App() {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setAttachmentPreview(null)
+        setCostNotePreview(null)
         setActiveModal(null)
         setEditingTaskId(null)
         setEditingCostId(null)
@@ -402,6 +405,10 @@ function App() {
 
   function closeAttachmentPreview() {
     setAttachmentPreview(null)
+  }
+
+  function closeCostNotePreview() {
+    setCostNotePreview(null)
   }
 
   function openNewTaskModal() {
@@ -1205,24 +1212,26 @@ function App() {
                     , {settings.investors.partner}{' '}
                     {formatCurrency((cost.amount * costSplit(cost, settings).partnerShare) / 100)}
                   </p>
-                  {cost.commentHtml && (
-                    <div
-                      className="item-comment rich-comment"
-                      dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(cost.commentHtml) }}
-                    />
-                  )}
-                  {cost.attachment && (
-                    <a
-                      className="attachment-link"
-                      href={attachmentHref(cost.attachment.path)}
-                      target="_blank"
-                    >
-                      <FileText size={16} />
-                      {cost.attachment.name}
-                    </a>
-                  )}
                 </div>
                 <div className="item-actions">
+                  {cost.commentHtml && (
+                    <button
+                      className="icon-button note-button"
+                      onClick={() => setCostNotePreview({ title: cost.title, commentHtml: cost.commentHtml })}
+                      title="Pokaż notatkę"
+                    >
+                      <StickyNote size={17} />
+                    </button>
+                  )}
+                  {cost.attachment && (
+                    <button
+                      className="icon-button attachment-button"
+                      onClick={() => setAttachmentPreview(cost.attachment || null)}
+                      title="Pokaż załącznik"
+                    >
+                      <Paperclip size={17} />
+                    </button>
+                  )}
                   <button
                     className="icon-button edit-button"
                     onClick={() => openEditCostModal(cost)}
@@ -1623,6 +1632,33 @@ function App() {
                 Otwórz w nowej karcie
               </a>
             </div>
+          </section>
+        </div>
+      )}
+
+      {costNotePreview && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeCostNotePreview}>
+          <section
+            className="modal-panel note-preview-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="note-preview-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head">
+              <div>
+                <p>Notatka</p>
+                <h2 id="note-preview-title">{costNotePreview.title}</h2>
+              </div>
+              <button className="modal-close" onClick={closeCostNotePreview} title="Zamknij">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div
+              className="note-preview-body rich-comment"
+              dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(costNotePreview.commentHtml || '') }}
+            />
           </section>
         </div>
       )}

@@ -929,6 +929,17 @@ input:disabled {
   background: #256387;
 }
 
+.note-button,
+.attachment-button {
+  color: var(--accent);
+  background: #eef3f6;
+}
+
+.note-button:hover,
+.attachment-button:hover {
+  background: #e2eaf0;
+}
+
 .cost-card strong {
   flex: 0 0 auto;
   color: var(--accent);
@@ -1046,6 +1057,21 @@ input:disabled {
 
 .attachment-preview-panel {
   width: min(1040px, 100%);
+}
+
+.note-preview-panel {
+  width: min(720px, 100%);
+}
+
+.note-preview-body {
+  max-height: min(68vh, 620px);
+  overflow: auto;
+  padding: 18px 20px 22px;
+  color: #354250;
+  background: #ffffff;
+  font-size: 0.94rem;
+  font-weight: 650;
+  line-height: 1.55;
 }
 
 .attachment-preview-body {
