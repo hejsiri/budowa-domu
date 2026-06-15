@@ -624,7 +624,7 @@ textarea {
   color: var(--text);
   background: #ffffff;
   font-size: 0.87rem;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0;
   line-height: 1.45;
   text-transform: none;
@@ -636,6 +636,16 @@ textarea {
 .rich-comment * {
   letter-spacing: 0;
   text-transform: none;
+}
+
+.rich-editor :where(p, div, ul, ol, li, span),
+.rich-comment :where(p, div, ul, ol, li, span) {
+  font-weight: 400;
+}
+
+.rich-editor :where(b, strong),
+.rich-comment :where(b, strong) {
+  font-weight: 700;
 }
 
 .rich-editor:empty::before,
@@ -1070,7 +1080,7 @@ input:disabled {
   color: #354250;
   background: #ffffff;
   font-size: 0.94rem;
-  font-weight: 650;
+  font-weight: 400;
   line-height: 1.55;
 }
 
