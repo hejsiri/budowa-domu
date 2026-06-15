@@ -525,9 +525,9 @@ label > span {
   justify-content: space-between;
   gap: 16px;
   padding: 18px 20px;
-  border-bottom: 1px solid #c6d6e0;
+  border-bottom: 1px solid #b5cad8;
   color: var(--accent-2);
-  background: #dfeaf2;
+  background: #c8dae6;
 }
 
 .module-heading h2 {
