@@ -1348,6 +1348,21 @@ input:disabled {
     font-size: 2rem;
   }
 
+  .item-card {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .item-main {
+    grid-column: 2;
+  }
+
+  .item-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
   .stat-panel {
     min-height: 108px;
     padding: 13px;
