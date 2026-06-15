@@ -3,6 +3,8 @@ import type { ChangeEvent, Dispatch, DragEvent, FormEvent, SetStateAction } from
 import {
   BanknoteArrowDown,
   Check,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   FileText,
   Home,
@@ -59,6 +61,12 @@ type AttachmentGroupPreview = {
   title: string
   label: string
   attachments: Attachment[]
+}
+
+type ImageGalleryPreview = {
+  title: string
+  images: Attachment[]
+  index: number
 }
 
 type Cost = {
@@ -454,6 +462,7 @@ function App() {
   const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null)
   const [attachmentGroupPreview, setAttachmentGroupPreview] = useState<AttachmentGroupPreview | null>(null)
+  const [imageGalleryPreview, setImageGalleryPreview] = useState<ImageGalleryPreview | null>(null)
   const [notePreview, setNotePreview] = useState<NotePreview | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
@@ -559,6 +568,7 @@ function App() {
       if (event.key === 'Escape') {
         setAttachmentPreview(null)
         setAttachmentGroupPreview(null)
+        setImageGalleryPreview(null)
         setNotePreview(null)
         setActiveModal(null)
         setEditingTaskId(null)
@@ -569,6 +579,40 @@ function App() {
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [])
+
+  useEffect(() => {
+    if (!imageGalleryPreview) {
+      return undefined
+    }
+
+    function navigateGallery(event: KeyboardEvent) {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+        return
+      }
+
+      event.preventDefault()
+      setImageGalleryPreview((current) => {
+        if (!current) {
+          return current
+        }
+
+        const lastIndex = current.images.length - 1
+        if (event.key === 'Home') {
+          return { ...current, index: 0 }
+        }
+        if (event.key === 'End') {
+          return { ...current, index: lastIndex }
+        }
+        if (event.key === 'ArrowLeft') {
+          return { ...current, index: current.index === 0 ? lastIndex : current.index - 1 }
+        }
+        return { ...current, index: current.index === lastIndex ? 0 : current.index + 1 }
+      })
+    }
+
+    window.addEventListener('keydown', navigateGallery)
+    return () => window.removeEventListener('keydown', navigateGallery)
+  }, [imageGalleryPreview])
 
   function resetTaskForm() {
     setTaskForm({
@@ -612,6 +656,34 @@ function App() {
 
   function closeAttachmentPreview() {
     setAttachmentPreview(null)
+  }
+
+  function openImageGallery(title: string, images: Attachment[], index = 0) {
+    setImageGalleryPreview({ title, images, index })
+  }
+
+  function closeImageGallery() {
+    setImageGalleryPreview(null)
+  }
+
+  function moveImageGallery(direction: -1 | 1) {
+    setImageGalleryPreview((current) => {
+      if (!current) {
+        return current
+      }
+
+      const lastIndex = current.images.length - 1
+      const nextIndex =
+        direction === -1
+          ? current.index === 0
+            ? lastIndex
+            : current.index - 1
+          : current.index === lastIndex
+            ? 0
+            : current.index + 1
+
+      return { ...current, index: nextIndex }
+    })
   }
 
   function openAttachmentGroup(title: string, label: string, attachments: Attachment[]) {
@@ -1420,7 +1492,7 @@ function App() {
                     {imageAttachments.length > 0 && (
                       <button
                         className="icon-button attachment-button attachment-group-button"
-                        onClick={() => openAttachmentGroup(task.title, 'Obrazy', imageAttachments)}
+                        onClick={() => openImageGallery(task.title, imageAttachments)}
                         title={`Pokaż obrazy (${imageAttachments.length})`}
                       >
                         <ImageIcon size={17} />
@@ -1538,7 +1610,7 @@ function App() {
                       {imageAttachments.length > 0 && (
                         <button
                           className="icon-button attachment-button attachment-group-button"
-                          onClick={() => openAttachmentGroup(cost.title, 'Obrazy', imageAttachments)}
+                          onClick={() => openImageGallery(cost.title, imageAttachments)}
                           title={`Pokaż obrazy (${imageAttachments.length})`}
                         >
                           <ImageIcon size={17} />
@@ -2089,6 +2161,89 @@ function App() {
                 </button>
               ))}
             </div>
+          </section>
+        </div>
+      )}
+
+      {imageGalleryPreview && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeImageGallery}>
+          <section
+            className="modal-panel image-gallery-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="image-gallery-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head image-gallery-head">
+              <div>
+                <p>Zdjęcia</p>
+                <h2 id="image-gallery-title">{imageGalleryPreview.title}</h2>
+              </div>
+              <div className="image-gallery-counter">
+                {imageGalleryPreview.index + 1} / {imageGalleryPreview.images.length}
+              </div>
+              <button className="modal-close" onClick={closeImageGallery} title="Zamknij">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="image-gallery-body">
+              {imageGalleryPreview.images.length > 1 && (
+                <button
+                  type="button"
+                  className="gallery-nav gallery-nav-prev"
+                  onClick={() => moveImageGallery(-1)}
+                  title="Poprzednie zdjęcie"
+                >
+                  <ChevronLeft size={28} />
+                </button>
+              )}
+
+              <img
+                src={attachmentHref(imageGalleryPreview.images[imageGalleryPreview.index].path)}
+                alt={imageGalleryPreview.images[imageGalleryPreview.index].name}
+              />
+
+              {imageGalleryPreview.images.length > 1 && (
+                <button
+                  type="button"
+                  className="gallery-nav gallery-nav-next"
+                  onClick={() => moveImageGallery(1)}
+                  title="Następne zdjęcie"
+                >
+                  <ChevronRight size={28} />
+                </button>
+              )}
+            </div>
+
+            <div className="image-gallery-footer">
+              <div className="image-gallery-filename">
+                {imageGalleryPreview.images[imageGalleryPreview.index].name}
+              </div>
+              <a
+                href={attachmentHref(imageGalleryPreview.images[imageGalleryPreview.index].path)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Otwórz w nowej karcie
+              </a>
+            </div>
+
+            {imageGalleryPreview.images.length > 1 && (
+              <div className="image-gallery-thumbs" aria-label="Miniatury zdjęć">
+                {imageGalleryPreview.images.map((image, index) => (
+                  <button
+                    type="button"
+                    className={index === imageGalleryPreview.index ? 'active' : ''}
+                    key={image.path}
+                    onClick={() => setImageGalleryPreview({ ...imageGalleryPreview, index })}
+                    title={image.name}
+                  >
+                    <img src={attachmentHref(image.path)} alt="" />
+                  </button>
+                ))}
+              </div>
+            )}
           </section>
         </div>
       )}
