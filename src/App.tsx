@@ -1431,7 +1431,7 @@ function App() {
               <BanknoteArrowDown size={24} />
               <div>
                 <p>Wydatki budowy</p>
-                <h2>Faktury, płatności i sumy</h2>
+                <h2>Faktury, płatności</h2>
               </div>
             </div>
             <div className="module-actions">
