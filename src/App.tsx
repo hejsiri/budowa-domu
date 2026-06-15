@@ -20,6 +20,7 @@ import './App.css'
 
 type TaskStatus = 'todo' | 'done'
 type PaymentStatus = 'unpaid' | 'paid'
+type CostPayer = 'me' | 'partner' | 'half' | 'custom'
 type ActiveSection = 'tasks' | 'costs'
 type AuthMode = 'login' | 'register' | 'verify'
 
@@ -52,6 +53,9 @@ type Cost = {
   area: string
   category: string
   amount: number
+  payer?: CostPayer
+  investorShare?: number
+  partnerShare?: number
   status: PaymentStatus
   paidDate: string
   attachment?: Attachment
@@ -82,6 +86,35 @@ function formatCurrency(value: number) {
 
 function formatInteger(value: number) {
   return formatWithThousands(Math.round(value))
+}
+
+function normalizeShare(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0
+  }
+
+  return Math.min(100, Math.max(0, value))
+}
+
+function costSplit(cost: Pick<Cost, 'payer' | 'investorShare' | 'partnerShare'>) {
+  if (cost.payer === 'partner') {
+    return { label: 'Płaci drugi inwestor', investorShare: 0, partnerShare: 100 }
+  }
+
+  if (cost.payer === 'half') {
+    return { label: 'Płatność na pół', investorShare: 50, partnerShare: 50 }
+  }
+
+  if (cost.payer === 'custom') {
+    const investorShare = normalizeShare(Number(cost.investorShare ?? 50))
+    return {
+      label: 'Inny podział',
+      investorShare,
+      partnerShare: normalizeShare(Number(cost.partnerShare ?? 100 - investorShare)),
+    }
+  }
+
+  return { label: 'Płacę ja', investorShare: 100, partnerShare: 0 }
 }
 
 const today = new Date().toISOString().slice(0, 10)
@@ -164,6 +197,8 @@ function App() {
     area: 'Stan surowy',
     category: 'Materialy',
     amount: '',
+    payer: 'me' as CostPayer,
+    investorShare: '100',
     status: 'unpaid' as PaymentStatus,
     paidDate: '',
   })
@@ -240,6 +275,8 @@ function App() {
       area: 'Stan surowy',
       category: 'Materialy',
       amount: '',
+      payer: 'me',
+      investorShare: '100',
       status: 'unpaid',
       paidDate: '',
     })
@@ -283,6 +320,8 @@ function App() {
       area: cost.area || 'Stan surowy',
       category: cost.category,
       amount: String(cost.amount),
+      payer: cost.payer || 'me',
+      investorShare: String(costSplit(cost).investorShare),
       status: cost.status,
       paidDate: cost.paidDate,
     })
@@ -386,6 +425,9 @@ function App() {
     body.append('area', costForm.area)
     body.append('category', costForm.category)
     body.append('amount', costForm.amount)
+    body.append('payer', costForm.payer)
+    body.append('investorShare', costForm.investorShare)
+    body.append('partnerShare', String(100 - normalizeShare(Number(costForm.investorShare))))
     body.append('status', costForm.status)
     body.append('paidDate', costForm.paidDate)
     if (invoice) {
@@ -847,6 +889,11 @@ function App() {
                       ? `zaplacone ${cost.paidDate || 'bez daty'}`
                       : 'do zaplaty'}
                   </p>
+                  <p className="cost-split">
+                    {costSplit(cost).label}: ja {formatCurrency((cost.amount * costSplit(cost).investorShare) / 100)}
+                    , drugi inwestor{' '}
+                    {formatCurrency((cost.amount * costSplit(cost).partnerShare) / 100)}
+                  </p>
                   {cost.attachment && (
                     <a
                       className="attachment-link"
@@ -1044,6 +1091,39 @@ function App() {
                     <option value="paid">Zapłacone</option>
                   </select>
                 </label>
+                <label>
+                  <span>Kto płaci</span>
+                  <select
+                    value={costForm.payer}
+                    onChange={(event) => {
+                      const payer = event.target.value as CostPayer
+                      const investorShare =
+                        payer === 'me' ? '100' : payer === 'partner' ? '0' : payer === 'half' ? '50' : costForm.investorShare
+                      setCostForm({ ...costForm, payer, investorShare })
+                    }}
+                  >
+                    <option value="me">Ja</option>
+                    <option value="partner">Drugi inwestor</option>
+                    <option value="half">Na pół</option>
+                    <option value="custom">Inny podział</option>
+                  </select>
+                </label>
+                {costForm.payer === 'custom' && (
+                  <label>
+                    <span>Mój udział %</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={costForm.investorShare}
+                      onChange={(event) =>
+                        setCostForm({ ...costForm, investorShare: event.target.value })
+                      }
+                      placeholder="50"
+                    />
+                  </label>
+                )}
                 <label>
                   <span>Kiedy zaplacono</span>
                   <input

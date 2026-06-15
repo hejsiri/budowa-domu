@@ -57,6 +57,9 @@ const initialState = {
       area: 'Dokumenty',
       category: 'Dokumenty',
       amount: 850,
+      payer: 'me',
+      investorShare: 100,
+      partnerShare: 0,
       status: 'paid',
       paidDate: '2026-06-05',
     },
@@ -66,6 +69,9 @@ const initialState = {
       area: 'Fundamenty',
       category: 'Materialy',
       amount: 6400,
+      payer: 'half',
+      investorShare: 50,
+      partnerShare: 50,
       status: 'unpaid',
       paidDate: '',
     },
@@ -134,6 +140,34 @@ function cleanText(value, fallback = '') {
 
 function getToday() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function cleanPayer(value) {
+  return ['me', 'partner', 'half', 'custom'].includes(value) ? value : 'me'
+}
+
+function cleanShare(value, fallback) {
+  const share = Number(value)
+  return Number.isFinite(share) ? Math.min(100, Math.max(0, share)) : fallback
+}
+
+function paymentSplitFromBody(body) {
+  const payer = cleanPayer(body.payer)
+  let investorShare = cleanShare(body.investorShare, 100)
+
+  if (payer === 'partner') {
+    investorShare = 0
+  } else if (payer === 'half') {
+    investorShare = 50
+  } else if (payer === 'me') {
+    investorShare = 100
+  }
+
+  return {
+    payer,
+    investorShare,
+    partnerShare: cleanShare(body.partnerShare, 100 - investorShare),
+  }
 }
 
 function fileAttachment(file) {
@@ -565,12 +599,16 @@ app.post('/api/costs', upload.single('invoice'), async (request, response, next)
     const state = await readState()
     const amount = Number(request.body.amount)
     const status = request.body.status === 'paid' ? 'paid' : 'unpaid'
+    const paymentSplit = paymentSplitFromBody(request.body)
     const cost = {
       id: randomUUID(),
       title: cleanText(request.body.title),
       area: cleanText(request.body.area, 'Inne'),
       category: cleanText(request.body.category, 'Inne'),
       amount,
+      payer: paymentSplit.payer,
+      investorShare: paymentSplit.investorShare,
+      partnerShare: paymentSplit.partnerShare,
       status,
       paidDate: status === 'paid' ? cleanText(request.body.paidDate, getToday()) : '',
       attachment: request.file
@@ -600,6 +638,7 @@ async function updateCost(request, response, next) {
     const state = await readState()
     const amount = Number(request.body.amount)
     const status = request.body.status === 'paid' ? 'paid' : 'unpaid'
+    const paymentSplit = paymentSplitFromBody(request.body)
     let previousAttachment
     let updatedCost = null
 
@@ -615,6 +654,9 @@ async function updateCost(request, response, next) {
         area: cleanText(request.body.area, 'Inne'),
         category: cleanText(request.body.category, 'Inne'),
         amount,
+        payer: paymentSplit.payer,
+        investorShare: paymentSplit.investorShare,
+        partnerShare: paymentSplit.partnerShare,
         status,
         paidDate: status === 'paid' ? cleanText(request.body.paidDate, getToday()) : '',
       }

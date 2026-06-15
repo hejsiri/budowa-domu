@@ -742,6 +742,11 @@ input:disabled {
   font-size: 0.92rem;
 }
 
+.cost-split {
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
 .attachment-link {
   align-items: center;
   gap: 7px;

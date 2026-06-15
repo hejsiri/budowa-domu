@@ -63,6 +63,9 @@ $initialState = [
             'area' => 'Dokumenty',
             'category' => 'Dokumenty',
             'amount' => 850,
+            'payer' => 'me',
+            'investorShare' => 100,
+            'partnerShare' => 0,
             'status' => 'paid',
             'paidDate' => '2026-06-05',
         ],
@@ -72,6 +75,9 @@ $initialState = [
             'area' => 'Fundamenty',
             'category' => 'Materialy',
             'amount' => 6400,
+            'payer' => 'half',
+            'investorShare' => 50,
+            'partnerShare' => 50,
             'status' => 'unpaid',
             'paidDate' => '',
         ],
@@ -254,6 +260,38 @@ function cleanText($value, string $fallback = ''): string
 {
     $text = trim((string)($value ?? $fallback));
     return $text !== '' ? $text : $fallback;
+}
+
+function cleanPayer($value): string
+{
+    $payer = (string)($value ?? 'me');
+    return in_array($payer, ['me', 'partner', 'half', 'custom'], true) ? $payer : 'me';
+}
+
+function cleanShare($value, float $fallback): float
+{
+    $share = is_numeric($value) ? (float)$value : $fallback;
+    return min(100, max(0, $share));
+}
+
+function paymentSplitFromPost(): array
+{
+    $payer = cleanPayer($_POST['payer'] ?? 'me');
+    $investorShare = cleanShare($_POST['investorShare'] ?? 100, 100);
+
+    if ($payer === 'partner') {
+        $investorShare = 0;
+    } elseif ($payer === 'half') {
+        $investorShare = 50;
+    } elseif ($payer === 'me') {
+        $investorShare = 100;
+    }
+
+    return [
+        'payer' => $payer,
+        'investorShare' => $investorShare,
+        'partnerShare' => cleanShare($_POST['partnerShare'] ?? (100 - $investorShare), 100 - $investorShare),
+    ];
 }
 
 function uploadedFiles(string $field): array
@@ -588,6 +626,7 @@ try {
         }
 
         if ($id !== '') {
+            $paymentSplit = paymentSplitFromPost();
             $previousAttachment = null;
             foreach ($state['costs'] as &$cost) {
                 if (($cost['id'] ?? '') === $id) {
@@ -596,6 +635,9 @@ try {
                     $cost['area'] = cleanText($_POST['area'] ?? '', 'Stan surowy');
                     $cost['category'] = cleanText($_POST['category'] ?? '', 'Inne');
                     $cost['amount'] = $amount;
+                    $cost['payer'] = $paymentSplit['payer'];
+                    $cost['investorShare'] = $paymentSplit['investorShare'];
+                    $cost['partnerShare'] = $paymentSplit['partnerShare'];
                     $cost['status'] = $status;
                     $cost['paidDate'] = $status === 'paid' ? cleanText($_POST['paidDate'] ?? '', date('Y-m-d')) : '';
 
@@ -617,12 +659,16 @@ try {
             respond($state);
         }
 
+        $paymentSplit = paymentSplitFromPost();
         $cost = [
             'id' => uuid(),
             'title' => $title,
             'area' => cleanText($_POST['area'] ?? '', 'Stan surowy'),
             'category' => cleanText($_POST['category'] ?? '', 'Inne'),
             'amount' => $amount,
+            'payer' => $paymentSplit['payer'],
+            'investorShare' => $paymentSplit['investorShare'],
+            'partnerShare' => $paymentSplit['partnerShare'],
             'status' => $status,
             'paidDate' => $status === 'paid' ? cleanText($_POST['paidDate'] ?? '', date('Y-m-d')) : '',
         ];

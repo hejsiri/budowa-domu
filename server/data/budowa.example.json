@@ -173,6 +173,9 @@
   ],
   "costs": [
     {
+      "payer": "me",
+      "investorShare": 100,
+      "partnerShare": 0,
       "id": "35e48606-0776-4587-a3a1-33b60708dd67",
       "title": "Materiały",
       "area": "Materialy",
@@ -182,6 +185,9 @@
       "paidDate": "2026-06-12"
     },
     {
+      "payer": "half",
+      "investorShare": 50,
+      "partnerShare": 50,
       "id": "7a3b663c-cf77-4508-a309-047557051321",
       "title": "transport",
       "area": "Transport",
@@ -191,6 +197,9 @@
       "paidDate": "2026-06-12"
     },
     {
+      "payer": "me",
+      "investorShare": 100,
+      "partnerShare": 0,
       "id": "c466f46a-75f4-41b6-a9e4-5168aa22994d",
       "title": "Mapa do celow projektowych",
       "area": "Dokumenty",
