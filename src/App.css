@@ -1272,7 +1272,11 @@ input:disabled {
 
   .workspace {
     width: calc(100% - 20px);
-    margin-top: 58px;
+    margin-top: 0;
+  }
+
+  .section-tabs {
+    margin: 14px auto 0;
   }
 
   .module-heading,
