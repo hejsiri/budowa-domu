@@ -1272,7 +1272,7 @@ input:disabled {
 
   .workspace {
     width: calc(100% - 20px);
-    margin-top: 16px;
+    margin-top: 0;
   }
 
   .module-heading,
@@ -1293,7 +1293,7 @@ input:disabled {
     display: grid;
     width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin: 14px auto 0;
+    margin: 14px auto -1px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.22);
   }
 
