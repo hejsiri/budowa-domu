@@ -709,8 +709,12 @@ function App() {
     )
   }
 
-  function deleteTask(id: string) {
-    runServerAction(() => requestJson<AppState>(apiEndpoint('tasks', id), { method: 'DELETE' }))
+  function deleteTask(task: Task) {
+    if (!window.confirm(`Czy na pewno usunąć zadanie "${task.title}"?`)) {
+      return
+    }
+
+    runServerAction(() => requestJson<AppState>(apiEndpoint('tasks', task.id), { method: 'DELETE' }))
   }
 
   function onTaskAttachmentsChange(event: ChangeEvent<HTMLInputElement>) {
@@ -788,8 +792,12 @@ function App() {
     )
   }
 
-  function deleteCost(id: string) {
-    runServerAction(() => requestJson<AppState>(apiEndpoint('costs', id), { method: 'DELETE' }))
+  function deleteCost(cost: Cost) {
+    if (!window.confirm(`Czy na pewno usunąć wydatek "${cost.title}"?`)) {
+      return
+    }
+
+    runServerAction(() => requestJson<AppState>(apiEndpoint('costs', cost.id), { method: 'DELETE' }))
   }
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
@@ -1211,7 +1219,7 @@ function App() {
                   >
                     <SquarePen size={17} />
                   </button>
-                  <button className="icon-button" onClick={() => deleteTask(task.id)} title="Usun zadanie">
+                  <button className="icon-button" onClick={() => deleteTask(task)} title="Usun zadanie">
                     <Trash size={18} />
                   </button>
                 </div>
@@ -1305,7 +1313,7 @@ function App() {
                   >
                     <SquarePen size={17} />
                   </button>
-                  <button className="icon-button" onClick={() => deleteCost(cost.id)} title="Usun wydatek">
+                  <button className="icon-button" onClick={() => deleteCost(cost)} title="Usun wydatek">
                     <Trash size={18} />
                   </button>
                 </div>
