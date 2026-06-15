@@ -1423,6 +1423,15 @@ function App() {
                     <option value="custom">Inny podział</option>
                   </select>
                 </label>
+                <label>
+                  <span>Kiedy zaplacono</span>
+                  <input
+                    type="date"
+                    value={costForm.paidDate}
+                    disabled={costForm.status === 'unpaid'}
+                    onChange={(event) => setCostForm({ ...costForm, paidDate: event.target.value })}
+                  />
+                </label>
                 <div className="quick-split wide" aria-label="Szybkie ustawienia platnosci">
                   <button type="button" className={costForm.payer === 'me' ? 'active' : ''} onClick={() => setCostPayer('me')}>
                     {settings.investors.primary}
@@ -1463,15 +1472,6 @@ function App() {
                     />
                   </label>
                 )}
-                <label>
-                  <span>Kiedy zaplacono</span>
-                  <input
-                    type="date"
-                    value={costForm.paidDate}
-                    disabled={costForm.status === 'unpaid'}
-                    onChange={(event) => setCostForm({ ...costForm, paidDate: event.target.value })}
-                  />
-                </label>
                 <label
                   className={`file-input wide drop-input ${invoiceDropActive ? 'is-dragging' : ''}`}
                   onDragOver={(event) => {
