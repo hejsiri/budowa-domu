@@ -233,6 +233,7 @@ function App() {
   const [taskView, setTaskView] = useState<TaskStatus | 'all'>('todo')
   const [costView, setCostView] = useState<PaymentStatus | 'all'>('unpaid')
   const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
+  const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<File | undefined>()
@@ -308,6 +309,7 @@ function App() {
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        setAttachmentPreview(null)
         setActiveModal(null)
         setEditingTaskId(null)
         setEditingCostId(null)
@@ -349,6 +351,10 @@ function App() {
     setActiveModal(null)
     setEditingTaskId(null)
     setEditingCostId(null)
+  }
+
+  function closeAttachmentPreview() {
+    setAttachmentPreview(null)
   }
 
   function openNewTaskModal() {
@@ -900,25 +906,25 @@ function App() {
                     <div className="attachment-list">
                       {task.attachments.map((attachment) => (
                         isImageAttachment(attachment) ? (
-                          <a
+                          <button
+                            type="button"
                             className="attachment-thumb"
-                            href={attachmentHref(attachment.path)}
-                            target="_blank"
                             key={attachment.path}
                             title={attachment.name}
+                            onClick={() => setAttachmentPreview(attachment)}
                           >
                             <img src={attachmentHref(attachment.path)} alt={attachment.name} loading="lazy" />
-                          </a>
+                          </button>
                         ) : (
-                          <a
+                          <button
+                            type="button"
                             className="attachment-link"
-                            href={attachmentHref(attachment.path)}
-                            target="_blank"
                             key={attachment.path}
+                            onClick={() => setAttachmentPreview(attachment)}
                           >
                             <FileText size={16} />
                             {attachment.name}
-                          </a>
+                          </button>
                         )
                       ))}
                     </div>
@@ -1319,6 +1325,42 @@ function App() {
                 </div>
               </form>
             )}
+          </section>
+        </div>
+      )}
+
+      {attachmentPreview && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeAttachmentPreview}>
+          <section
+            className="modal-panel attachment-preview-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="attachment-preview-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head">
+              <div>
+                <p>Załącznik</p>
+                <h2 id="attachment-preview-title">{attachmentPreview.name}</h2>
+              </div>
+              <button className="modal-close" onClick={closeAttachmentPreview} title="Zamknij">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="attachment-preview-body">
+              {isImageAttachment(attachmentPreview) ? (
+                <img src={attachmentHref(attachmentPreview.path)} alt={attachmentPreview.name} />
+              ) : (
+                <iframe src={attachmentHref(attachmentPreview.path)} title={attachmentPreview.name} />
+              )}
+            </div>
+
+            <div className="attachment-preview-actions">
+              <a href={attachmentHref(attachmentPreview.path)} target="_blank" rel="noreferrer">
+                Otwórz w nowej karcie
+              </a>
+            </div>
           </section>
         </div>
       )}

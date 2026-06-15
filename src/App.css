@@ -794,6 +794,8 @@ input:disabled {
   color: var(--accent-2);
   font-size: 0.84rem;
   font-weight: 850;
+  border: 0;
+  cursor: pointer;
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -816,10 +818,17 @@ input:disabled {
   display: block;
   width: 82px;
   height: 62px;
+  padding: 0;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #eef3f6;
+  cursor: pointer;
+}
+
+.attachment-link:hover,
+.attachment-thumb:hover {
+  filter: brightness(0.98);
 }
 
 .attachment-thumb img {
@@ -848,6 +857,54 @@ input:disabled {
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 30px 90px rgba(7, 18, 31, 0.32);
+}
+
+.attachment-preview-panel {
+  width: min(1040px, 100%);
+}
+
+.attachment-preview-body {
+  display: grid;
+  place-items: center;
+  min-height: 56vh;
+  padding: 14px;
+  background: #eef3f6;
+}
+
+.attachment-preview-body img,
+.attachment-preview-body iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.attachment-preview-body img {
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.attachment-preview-body iframe {
+  height: 70vh;
+}
+
+.attachment-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: #ffffff;
+}
+
+.attachment-preview-actions a {
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--accent);
+  font-size: 0.84rem;
+  font-weight: 900;
+  text-decoration: none;
 }
 
 .modal-head {
