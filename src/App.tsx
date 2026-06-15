@@ -25,6 +25,8 @@ type PaymentStatus = 'unpaid' | 'paid'
 type CostPayer = 'me' | 'partner' | 'half' | 'custom'
 type ActiveSection = 'tasks' | 'costs'
 type AuthMode = 'login' | 'register' | 'verify'
+type TaskView = TaskStatus | 'all'
+type CostView = PaymentStatus | 'all'
 
 type AuthStatus = {
   authenticated: boolean
@@ -89,6 +91,18 @@ const defaultSettings: SettingsState = {
 }
 
 const emptyState: AppState = { tasks: [], costs: [], settings: defaultSettings }
+const savedActiveSectionKey = 'budowa.activeSection'
+const savedTaskViewKey = 'budowa.taskView'
+const savedCostViewKey = 'budowa.costView'
+
+function readSavedSetting<T extends string>(key: string, fallback: T, allowedValues: readonly T[]) {
+  if (typeof window === 'undefined') {
+    return fallback
+  }
+
+  const savedValue = window.localStorage.getItem(key)
+  return savedValue && allowedValues.includes(savedValue as T) ? (savedValue as T) : fallback
+}
 
 const numberParts = new Intl.NumberFormat('pl-PL', {
   useGrouping: false,
@@ -288,9 +302,15 @@ function App() {
   const [state, setState] = useState<AppState>(emptyState)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeSection, setActiveSection] = useState<ActiveSection>('tasks')
-  const [taskView, setTaskView] = useState<TaskStatus | 'all'>('todo')
-  const [costView, setCostView] = useState<PaymentStatus | 'all'>('all')
+  const [activeSection, setActiveSection] = useState<ActiveSection>(() => {
+    return readSavedSetting<ActiveSection>(savedActiveSectionKey, 'tasks', ['tasks', 'costs'])
+  })
+  const [taskView, setTaskView] = useState<TaskView>(() => {
+    return readSavedSetting<TaskView>(savedTaskViewKey, 'todo', ['todo', 'done', 'all'])
+  })
+  const [costView, setCostView] = useState<CostView>(() => {
+    return readSavedSetting<CostView>(savedCostViewKey, 'all', ['unpaid', 'paid', 'all'])
+  })
   const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null)
   const [costNotePreview, setCostNotePreview] = useState<Pick<Cost, 'title' | 'commentHtml'> | null>(null)
@@ -371,6 +391,18 @@ function App() {
     refreshAuth()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem(savedActiveSectionKey, activeSection)
+  }, [activeSection])
+
+  useEffect(() => {
+    window.localStorage.setItem(savedTaskViewKey, taskView)
+  }, [taskView])
+
+  useEffect(() => {
+    window.localStorage.setItem(savedCostViewKey, costView)
+  }, [costView])
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
