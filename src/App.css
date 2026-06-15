@@ -404,6 +404,66 @@ label span {
   font-weight: 700;
 }
 
+.investor-progress {
+  display: grid;
+  gap: 7px;
+  margin-top: 13px;
+}
+
+.investor-progress-bar {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.investor-progress-bar::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent calc(10% - 1px),
+    rgba(12, 38, 66, 0.22) calc(10% - 1px),
+    rgba(12, 38, 66, 0.22) 10%
+  );
+}
+
+.investor-progress-bar span {
+  min-width: 2px;
+  height: 100%;
+}
+
+.investor-progress-primary {
+  background: #ffffff;
+}
+
+.investor-progress-partner {
+  background: #d08a2e;
+}
+
+.investor-progress-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.investor-progress-legend span {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .workspace {
   width: min(1040px, calc(100% - 32px));
   align-items: flex-start;

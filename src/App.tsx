@@ -422,6 +422,7 @@ function App() {
   }
 
   const summary = useMemo(() => {
+    const paidCosts = state.costs.filter((cost) => cost.status === 'paid')
     const paid = state.costs
       .filter((cost) => cost.status === 'paid')
       .reduce((sum, cost) => sum + cost.amount, 0)
@@ -433,10 +434,16 @@ function App() {
       total: paid + unpaid,
       paid,
       unpaid,
+      paidInvestor: paidCosts.reduce((sum, cost) => {
+        return sum + (cost.amount * costSplit(cost, settings).investorShare) / 100
+      }, 0),
+      paidPartner: paidCosts.reduce((sum, cost) => {
+        return sum + (cost.amount * costSplit(cost, settings).partnerShare) / 100
+      }, 0),
       todoTasks: state.tasks.filter((task) => task.status === 'todo').length,
       doneTasks: state.tasks.filter((task) => task.status === 'done').length,
     }
-  }, [state.costs, state.tasks])
+  }, [settings, state.costs, state.tasks])
 
   const filteredTasks = state.tasks.filter((task) => {
     return taskView === 'all' ? true : task.status === taskView
@@ -954,6 +961,26 @@ function App() {
             <small>
               {formatInteger(state.costs.filter((cost) => cost.status === 'paid').length)} pozycji
             </small>
+            <div className="investor-progress" aria-label="Podzial zaplaconych wydatkow">
+              <div className="investor-progress-bar">
+                <span
+                  className="investor-progress-primary"
+                  style={{ width: `${summary.paid > 0 ? (summary.paidInvestor / summary.paid) * 100 : 50}%` }}
+                />
+                <span
+                  className="investor-progress-partner"
+                  style={{ width: `${summary.paid > 0 ? (summary.paidPartner / summary.paid) * 100 : 50}%` }}
+                />
+              </div>
+              <div className="investor-progress-legend">
+                <span>
+                  {settings.investors.primary} {formatCurrency(summary.paidInvestor)}
+                </span>
+                <span>
+                  {settings.investors.partner} {formatCurrency(summary.paidPartner)}
+                </span>
+              </div>
+            </div>
           </article>
           <article className="stat-panel">
             <span>Zadania</span>
