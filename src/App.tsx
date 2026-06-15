@@ -1061,9 +1061,9 @@ function App() {
           <button className="hero-icon-button" onClick={openSettingsModal} title="Ustawienia" aria-label="Ustawienia">
             <Settings size={17} />
           </button>
-          <button className="logout-button" onClick={logout}>
+          <button className="logout-button" onClick={logout} title="Wyloguj" aria-label="Wyloguj">
             <LogOut size={16} />
-            Wyloguj
+            <span>Wyloguj</span>
           </button>
         </div>
 

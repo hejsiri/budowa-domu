@@ -1273,6 +1273,17 @@ input:disabled {
     right: 14px;
   }
 
+  .hero-icon-button,
+  .logout-button {
+    width: 38px;
+    min-height: 38px;
+    padding: 0;
+  }
+
+  .logout-button span {
+    display: none;
+  }
+
   .entry-form,
   .cost-form {
     grid-template-columns: 1fr;
