@@ -85,7 +85,7 @@ function readStorageFile(string $file, array $fallback): array
     return is_array($decoded) ? $decoded : $fallback;
 }
 
-function writeStorageFile(string $file, array $payload): void
+function writeStorageFile(string $file, array $payload)
 {
     $dir = dirname($file);
     if (!is_dir($dir)) {
@@ -140,7 +140,7 @@ function cookieOptions(int $expires): array
     ];
 }
 
-function createSession(string $sessionsFile, string $email): void
+function createSession(string $sessionsFile, string $email)
 {
     $token = bin2hex(random_bytes(32));
     $sessions = readStorageFile($sessionsFile, ['sessions' => []]);
@@ -160,7 +160,7 @@ function createSession(string $sessionsFile, string $email): void
     setcookie('budowa_session', $token, cookieOptions(time() + 60 * 60 * 24 * 14));
 }
 
-function currentUser(string $sessionsFile): ?array
+function currentUser(string $sessionsFile)
 {
     $token = (string)($_COOKIE['budowa_session'] ?? '');
     if ($token === '') {
@@ -179,7 +179,7 @@ function currentUser(string $sessionsFile): ?array
     return null;
 }
 
-function clearSession(string $sessionsFile): void
+function clearSession(string $sessionsFile)
 {
     $token = (string)($_COOKIE['budowa_session'] ?? '');
     if ($token !== '') {
@@ -204,7 +204,7 @@ function readJsonBody(): array
     return is_array($decoded) ? $decoded : [];
 }
 
-function ensureStorage(array $initialState, string $dataDir, string $uploadsDir, string $dataFile, string $legacyDataFile, string $exampleDataFile): void
+function ensureStorage(array $initialState, string $dataDir, string $uploadsDir, string $dataFile, string $legacyDataFile, string $exampleDataFile)
 {
     if (!is_dir($dataDir)) {
         mkdir($dataDir, 0775, true);
@@ -234,7 +234,7 @@ function readState(string $dataFile): array
     return is_array($state) ? $state : ['tasks' => [], 'costs' => []];
 }
 
-function writeState(string $dataFile, array $state): void
+function writeState(string $dataFile, array $state)
 {
     file_put_contents($dataFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
 }
@@ -299,7 +299,7 @@ function saveUploadedFiles(string $field, string $uploadsDir, string $fallbackBa
     return $attachments;
 }
 
-function deleteAttachmentFiles(array $attachments): void
+function deleteAttachmentFiles(array $attachments)
 {
     foreach ($attachments as $attachment) {
         if (!isset($attachment['path'])) {
@@ -313,7 +313,7 @@ function deleteAttachmentFiles(array $attachments): void
     }
 }
 
-function respond($payload, int $status = 200): void
+function respond($payload, int $status = 200)
 {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
