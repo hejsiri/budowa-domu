@@ -1985,7 +1985,7 @@ function App() {
                   onDragLeave={() => setInvoiceDropActive(false)}
                   onDrop={onInvoiceDrop}
                 >
-                  <span>{editingCostId ? 'Nowe dokumenty' : 'Dokumenty'}</span>
+                  <span>{editingCostId ? 'Nowe dokumenty' : 'Nowy dokument'}</span>
                   <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,application/pdf" multiple onChange={onDocumentFilesChange(setCostDocumentFiles)} />
                   <em>
                     <FileText size={16} />
