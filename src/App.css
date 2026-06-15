@@ -1024,6 +1024,28 @@ input:disabled {
   background: #3d4650;
 }
 
+.attachment-group-button {
+  position: relative;
+}
+
+.attachment-count {
+  position: absolute;
+  right: -5px;
+  top: -6px;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  place-items: center;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #b94636;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .amount-badge {
   flex: 0 0 auto;
   border: 1px solid #bfd0dc;
@@ -1151,6 +1173,10 @@ input:disabled {
   width: min(1040px, 100%);
 }
 
+.attachment-group-panel {
+  width: min(560px, 100%);
+}
+
 .note-preview-panel {
   width: min(720px, 100%);
 }
@@ -1208,6 +1234,43 @@ input:disabled {
   font-size: 0.84rem;
   font-weight: 900;
   text-decoration: none;
+}
+
+.attachment-choice-list {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.attachment-choice {
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  background: #ffffff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.attachment-choice:hover {
+  background: #f4f8fb;
+}
+
+.attachment-choice svg {
+  flex: 0 0 auto;
+  color: var(--accent-2);
+}
+
+.attachment-choice span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modal-head {

@@ -54,6 +54,12 @@ type Attachment = {
   mimeType: string
 }
 
+type AttachmentGroupPreview = {
+  title: string
+  label: string
+  attachments: Attachment[]
+}
+
 type Cost = {
   id: string
   title: string
@@ -246,6 +252,10 @@ function isImageAttachment(attachment: Attachment) {
   return attachment.mimeType.startsWith('image/')
 }
 
+function isPdfAttachment(attachment: Attachment) {
+  return attachment.mimeType === 'application/pdf' || attachment.name.toLowerCase().endsWith('.pdf')
+}
+
 function taskPriority(priority: string) {
   return priority === 'Pilne' ? 'Pilne' : 'Normalne'
 }
@@ -337,6 +347,7 @@ function App() {
   })
   const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null)
+  const [attachmentGroupPreview, setAttachmentGroupPreview] = useState<AttachmentGroupPreview | null>(null)
   const [notePreview, setNotePreview] = useState<NotePreview | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
@@ -432,6 +443,7 @@ function App() {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setAttachmentPreview(null)
+        setAttachmentGroupPreview(null)
         setNotePreview(null)
         setActiveModal(null)
         setEditingTaskId(null)
@@ -481,6 +493,19 @@ function App() {
 
   function closeAttachmentPreview() {
     setAttachmentPreview(null)
+  }
+
+  function openAttachmentGroup(title: string, label: string, attachments: Attachment[]) {
+    if (attachments.length === 1) {
+      setAttachmentPreview(attachments[0])
+      return
+    }
+
+    setAttachmentGroupPreview({ title, label, attachments })
+  }
+
+  function closeAttachmentGroupPreview() {
+    setAttachmentGroupPreview(null)
   }
 
   function closeCostNotePreview() {
@@ -1196,74 +1221,74 @@ function App() {
           <div className="list">
             {isLoading ? <p className="empty">Ładuję dane z serwera...</p> : null}
             {!isLoading && filteredTasks.length === 0 ? <p className="empty">Brak zadań w tym widoku.</p> : null}
-            {filteredTasks.map((task) => (
-              <article className={`item-card task-card${taskPriorityClass(task.priority)}`} key={task.id}>
-                <button
-                  className={`status-dot ${task.status}`}
-                  onClick={() => toggleTask(task.id)}
-                  title={task.status === 'done' ? 'Oznacz jako do zrobienia' : 'Oznacz jako zrobione'}
-                >
-                  {task.status === 'done' && <Check size={16} />}
-                </button>
-                <div className="item-main">
-                  <div className="item-title-row">
-                    <h3>{task.title}</h3>
-                    {taskPriority(task.priority) === 'Pilne' && <span className="badge pilne">Pilne</span>}
-                  </div>
-                  <p>
-                    {task.area} · termin {formatTaskDateTime(task)}
-                  </p>
-                  {task.attachments && task.attachments.length > 0 && (
-                    <div className="attachment-list">
-                      {task.attachments.map((attachment) => (
-                        isImageAttachment(attachment) ? (
-                          <button
-                            type="button"
-                            className="attachment-thumb"
-                            key={attachment.path}
-                            title={attachment.name}
-                            onClick={() => setAttachmentPreview(attachment)}
-                          >
-                            <img src={attachmentHref(attachment.path)} alt={attachment.name} loading="lazy" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="attachment-link"
-                            key={attachment.path}
-                            onClick={() => setAttachmentPreview(attachment)}
-                          >
-                            <FileText size={16} />
-                            {attachment.name}
-                          </button>
-                        )
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="item-actions">
-                  {task.comment && (
-                    <button
-                      className="icon-button note-button"
-                      onClick={() => setNotePreview({ title: task.title, commentHtml: plainTextToHtml(task.comment || '') })}
-                      title="Pokaż komentarz"
-                    >
-                      <StickyNote size={17} />
-                    </button>
-                  )}
+            {filteredTasks.map((task) => {
+              const attachments = task.attachments || []
+              const imageAttachments = attachments.filter(isImageAttachment)
+              const documentAttachments = attachments.filter((attachment) => !isImageAttachment(attachment))
+              const documentLabel = documentAttachments.every(isPdfAttachment) ? 'PDF' : 'Dokumenty'
+
+              return (
+                <article className={`item-card task-card${taskPriorityClass(task.priority)}`} key={task.id}>
                   <button
-                    className="icon-button edit-button"
-                    onClick={() => openEditTaskModal(task)}
-                    title="Edytuj zadanie"
+                    className={`status-dot ${task.status}`}
+                    onClick={() => toggleTask(task.id)}
+                    title={task.status === 'done' ? 'Oznacz jako do zrobienia' : 'Oznacz jako zrobione'}
                   >
-                    <SquarePen size={17} />
+                    {task.status === 'done' && <Check size={16} />}
                   </button>
-                  <button className="icon-button" onClick={() => deleteTask(task)} title="Usuń zadanie">
-                    <Trash size={18} />
-                  </button>
-                </div>
-              </article>
-            ))}
+                  <div className="item-main">
+                    <div className="item-title-row">
+                      <h3>{task.title}</h3>
+                      {taskPriority(task.priority) === 'Pilne' && <span className="badge pilne">Pilne</span>}
+                    </div>
+                    <p>
+                      {task.area} · termin {formatTaskDateTime(task)}
+                    </p>
+                  </div>
+                  <div className="item-actions">
+                    {task.comment && (
+                      <button
+                        className="icon-button note-button"
+                        onClick={() => setNotePreview({ title: task.title, commentHtml: plainTextToHtml(task.comment || '') })}
+                        title="Pokaż komentarz"
+                      >
+                        <StickyNote size={17} />
+                      </button>
+                    )}
+                    {imageAttachments.length > 0 && (
+                      <button
+                        className="icon-button attachment-button attachment-group-button"
+                        onClick={() => openAttachmentGroup(task.title, 'Obrazy', imageAttachments)}
+                        title={`Pokaż obrazy (${imageAttachments.length})`}
+                      >
+                        <ImageIcon size={17} />
+                        {imageAttachments.length > 1 && <span className="attachment-count">{imageAttachments.length}</span>}
+                      </button>
+                    )}
+                    {documentAttachments.length > 0 && (
+                      <button
+                        className="icon-button attachment-button attachment-group-button"
+                        onClick={() => openAttachmentGroup(task.title, documentLabel, documentAttachments)}
+                        title={`Pokaż ${documentLabel.toLowerCase()} (${documentAttachments.length})`}
+                      >
+                        <FileText size={17} />
+                        {documentAttachments.length > 1 && <span className="attachment-count">{documentAttachments.length}</span>}
+                      </button>
+                    )}
+                    <button
+                      className="icon-button edit-button"
+                      onClick={() => openEditTaskModal(task)}
+                      title="Edytuj zadanie"
+                    >
+                      <SquarePen size={17} />
+                    </button>
+                    <button className="icon-button" onClick={() => deleteTask(task)} title="Usuń zadanie">
+                      <Trash size={18} />
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         </section>
         )}
@@ -1704,6 +1729,45 @@ function App() {
                 </div>
               </form>
             )}
+          </section>
+        </div>
+      )}
+
+      {attachmentGroupPreview && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeAttachmentGroupPreview}>
+          <section
+            className="modal-panel attachment-group-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="attachment-group-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head">
+              <div>
+                <p>{attachmentGroupPreview.label}</p>
+                <h2 id="attachment-group-title">{attachmentGroupPreview.title}</h2>
+              </div>
+              <button className="modal-close" onClick={closeAttachmentGroupPreview} title="Zamknij">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="attachment-choice-list">
+              {attachmentGroupPreview.attachments.map((attachment) => (
+                <button
+                  type="button"
+                  className="attachment-choice"
+                  key={attachment.path}
+                  onClick={() => {
+                    setAttachmentGroupPreview(null)
+                    setAttachmentPreview(attachment)
+                  }}
+                >
+                  {isImageAttachment(attachment) ? <ImageIcon size={18} /> : <FileText size={18} />}
+                  <span>{attachment.name}</span>
+                </button>
+              ))}
+            </div>
           </section>
         </div>
       )}
