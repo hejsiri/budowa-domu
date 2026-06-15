@@ -1080,6 +1080,12 @@ function App() {
             <span>Planowany koszt inwestycji</span>
             <strong>{formatCurrency(summary.total)}</strong>
             <small>Wszystkie wydatki z rejestru</small>
+            <div
+              className="total-progress"
+              aria-label={`Zapłacone ${formatCurrency(summary.paid)} z ${formatCurrency(summary.total)}`}
+            >
+              <span style={{ width: `${summary.total > 0 ? (summary.paid / summary.total) * 100 : 0}%` }} />
+            </div>
           </article>
           <article className="stat-panel paid-summary">
             <span>Zapłacone do tej pory</span>
