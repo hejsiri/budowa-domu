@@ -1165,7 +1165,7 @@ function App() {
                 <div className="item-main">
                   <div className="item-title-row">
                     <h3>{task.title}</h3>
-                    <span className={`badge ${taskPriority(task.priority).toLowerCase()}`}>{taskPriority(task.priority)}</span>
+                    {taskPriority(task.priority) === 'Pilne' && <span className="badge pilne">Pilne</span>}
                   </div>
                   <p>
                     {task.area} · termin {formatTaskDateTime(task)}
@@ -1408,15 +1408,15 @@ function App() {
                     <option value="Materialy">Materiały</option>
                   </select>
                 </label>
-                <label>
-                  <span>Priorytet</span>
-                  <select
-                    value={taskForm.priority}
-                    onChange={(event) => setTaskForm({ ...taskForm, priority: event.target.value })}
-                  >
-                    <option>Normalne</option>
-                    <option>Pilne</option>
-                  </select>
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={taskForm.priority === 'Pilne'}
+                    onChange={(event) =>
+                      setTaskForm({ ...taskForm, priority: event.target.checked ? 'Pilne' : 'Normalne' })
+                    }
+                  />
+                  <span>Pilne</span>
                 </label>
                 <label>
                   <span>Termin</span>
