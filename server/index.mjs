@@ -780,7 +780,7 @@ app.post('/api/costs', upload.single('invoice'), async (request, response, next)
         : undefined,
     }
 
-    if (!cost.title || !Number.isFinite(cost.amount) || cost.amount <= 0) {
+    if (!cost.title || !Number.isFinite(cost.amount) || cost.amount < 0) {
       response.status(400).json({ message: 'Podaj opis i prawidlowa kwote kosztu.' })
       return
     }
@@ -832,7 +832,7 @@ async function updateCost(request, response, next) {
       return updatedCost
     })
 
-    if (!updatedCost?.title || !Number.isFinite(updatedCost.amount) || updatedCost.amount <= 0) {
+    if (!updatedCost?.title || !Number.isFinite(updatedCost.amount) || updatedCost.amount < 0) {
       response.status(400).json({ message: 'Podaj opis i prawidlowa kwote kosztu.' })
       return
     }

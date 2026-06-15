@@ -626,7 +626,7 @@ function App() {
   async function addCost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const amount = Number(costForm.amount)
-    if (!costForm.title.trim() || !Number.isFinite(amount) || amount <= 0) {
+    if (!costForm.title.trim() || !Number.isFinite(amount) || amount < 0) {
       return
     }
 

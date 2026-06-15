@@ -759,7 +759,7 @@ try {
         $title = cleanText($_POST['title'] ?? '');
         $status = ($_POST['status'] ?? '') === 'paid' ? 'paid' : 'unpaid';
 
-        if ($title === '' || $amount <= 0) {
+        if ($title === '' || $amount < 0) {
             respond(['message' => 'Podaj opis i prawidlowa kwote kosztu.'], 400);
         }
 
