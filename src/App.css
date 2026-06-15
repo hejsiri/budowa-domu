@@ -264,7 +264,7 @@
 .brand p,
 .module-heading p,
 .stat-panel span,
-label span {
+label > span {
   margin: 0;
   color: #697683;
   font-size: 0.72rem;
@@ -625,9 +625,17 @@ textarea {
   background: #ffffff;
   font-size: 0.87rem;
   font-weight: 600;
+  letter-spacing: 0;
   line-height: 1.45;
+  text-transform: none;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.rich-editor *,
+.rich-comment * {
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .rich-editor:empty::before,
