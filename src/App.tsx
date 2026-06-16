@@ -2166,26 +2166,17 @@ function App() {
       )}
 
       {imageGalleryPreview && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={closeImageGallery}>
+        <div className="modal-backdrop image-gallery-backdrop" role="presentation" onMouseDown={closeImageGallery}>
           <section
             className="modal-panel image-gallery-panel"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="image-gallery-title"
+            aria-label="Przeglądarka zdjęć"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <div className="modal-head image-gallery-head">
-              <div>
-                <p>Zdjęcia</p>
-                <h2 id="image-gallery-title">{imageGalleryPreview.title}</h2>
-              </div>
-              <div className="image-gallery-counter">
-                {imageGalleryPreview.index + 1} / {imageGalleryPreview.images.length}
-              </div>
-              <button className="modal-close" onClick={closeImageGallery} title="Zamknij">
-                <X size={20} />
-              </button>
-            </div>
+            <button className="image-gallery-close" onClick={closeImageGallery} title="Zamknij">
+              <X size={24} />
+            </button>
 
             <div className="image-gallery-body">
               {imageGalleryPreview.images.length > 1 && (
@@ -2214,19 +2205,6 @@ function App() {
                   <ChevronRight size={28} />
                 </button>
               )}
-            </div>
-
-            <div className="image-gallery-footer">
-              <div className="image-gallery-filename">
-                {imageGalleryPreview.images[imageGalleryPreview.index].name}
-              </div>
-              <a
-                href={attachmentHref(imageGalleryPreview.images[imageGalleryPreview.index].path)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Otwórz w nowej karcie
-              </a>
             </div>
 
             {imageGalleryPreview.images.length > 1 && (
