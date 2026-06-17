@@ -28,7 +28,7 @@ type TaskStatus = 'todo' | 'done'
 type PaymentStatus = 'planned' | 'unpaid' | 'paid'
 type CostPayer = 'me' | 'partner' | 'half' | 'custom'
 type ActiveSection = 'tasks' | 'costs' | 'wallet'
-type AuthMode = 'login' | 'register' | 'verify'
+type AuthMode = 'login' | 'register' | 'verify' | 'emailLogin' | 'emailCode'
 type TaskView = TaskStatus | 'all'
 type CostView = PaymentStatus | 'all'
 type FileSetter = Dispatch<SetStateAction<File[]>>
@@ -1265,6 +1265,51 @@ function App() {
     }
   }
 
+  async function startEmailLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    setAuthMessage('')
+
+    try {
+      const result = await requestJson<{ message: string; developmentCode?: string }>(
+        apiEndpoint('auth', undefined, 'email-login-start'),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: authForm.email }),
+        },
+      )
+      setAuthMessage(
+        result.developmentCode
+          ? `${result.message} Kod lokalny: ${result.developmentCode}`
+          : result.message,
+      )
+      setAuthMode('emailCode')
+      setAuthForm((current) => ({ ...current, code: '' }))
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie wyslac kodu.')
+    }
+  }
+
+  async function verifyEmailLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    setAuthMessage('')
+
+    try {
+      const result = await requestJson<AuthStatus>(apiEndpoint('auth', undefined, 'email-login-verify'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: authForm.email, code: authForm.code }),
+      })
+      setAuth({ authenticated: true, setupRequired: false, email: result.email })
+      setAuthForm((current) => ({ ...current, password: '', passwordConfirm: '', code: '' }))
+      await refreshState()
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie potwierdzic kodu.')
+    }
+  }
+
   async function logout() {
     setError('')
     await requestJson(apiEndpoint('auth', undefined, 'logout'), { method: 'POST' }).catch(() => undefined)
@@ -1286,14 +1331,16 @@ function App() {
       <main className="auth-shell">
         <section className="auth-card">
           <span className="auth-mark">
-            {authMode === 'verify' ? <KeyRound size={24} /> : <Lock size={24} />}
+            {authMode === 'verify' || authMode === 'emailCode' ? <KeyRound size={24} /> : <Lock size={24} />}
           </span>
           <p>Panel inwestora</p>
           <h1>
             {authMode === 'register'
               ? 'Utwórz pierwsze konto'
-              : authMode === 'verify'
+              : authMode === 'verify' || authMode === 'emailCode'
                 ? 'Wpisz kod z emaila'
+                : authMode === 'emailLogin'
+                  ? 'Zaloguj kodem email'
                 : 'Zaloguj się'}
           </h1>
 
@@ -1364,6 +1411,7 @@ function App() {
                     value={authForm.code}
                     onChange={(event) => setAuthForm({ ...authForm, code: event.target.value })}
                     placeholder="000000"
+                    autoComplete="one-time-code"
                     autoFocus
                     required
                   />
@@ -1372,6 +1420,75 @@ function App() {
               <button className="primary-action auth-submit" type="submit">
                 <Check size={18} />
                 Potwierdź konto
+              </button>
+            </form>
+          )}
+
+          {authMode === 'emailLogin' && (
+            <form className="auth-form" onSubmit={startEmailLogin}>
+              <label>
+                <span>Adres email inwestora</span>
+                <div className="auth-input">
+                  <Mail size={18} />
+                  <input
+                    type="email"
+                    value={authForm.email}
+                    onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })}
+                    autoComplete="email"
+                    autoFocus
+                    required
+                  />
+                </div>
+              </label>
+              <button className="primary-action auth-submit" type="submit">
+                <Mail size={18} />
+                Wyślij kod
+              </button>
+              <button
+                className="secondary-action auth-submit"
+                type="button"
+                onClick={() => {
+                  setError('')
+                  setAuthMessage('')
+                  setAuthMode('login')
+                }}
+              >
+                Zaloguj hasłem
+              </button>
+            </form>
+          )}
+
+          {authMode === 'emailCode' && (
+            <form className="auth-form" onSubmit={verifyEmailLogin}>
+              <label>
+                <span>Kod logowania</span>
+                <div className="auth-input">
+                  <KeyRound size={18} />
+                  <input
+                    inputMode="numeric"
+                    value={authForm.code}
+                    onChange={(event) => setAuthForm({ ...authForm, code: event.target.value })}
+                    placeholder="000000"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    required
+                  />
+                </div>
+              </label>
+              <button className="primary-action auth-submit" type="submit">
+                <Check size={18} />
+                Zaloguj
+              </button>
+              <button
+                className="secondary-action auth-submit"
+                type="button"
+                onClick={() => {
+                  setError('')
+                  setAuthMessage('')
+                  setAuthMode('emailLogin')
+                }}
+              >
+                Wyślij kod ponownie
               </button>
             </form>
           )}
@@ -1408,6 +1525,17 @@ function App() {
               <button className="primary-action auth-submit" type="submit">
                 <Lock size={18} />
                 Zaloguj się
+              </button>
+              <button
+                className="secondary-action auth-submit"
+                type="button"
+                onClick={() => {
+                  setError('')
+                  setAuthMessage('')
+                  setAuthMode('emailLogin')
+                }}
+              >
+                Zaloguj kodem email
               </button>
             </form>
           )}

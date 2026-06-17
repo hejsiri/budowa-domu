@@ -183,6 +183,32 @@ function sendVerificationEmail(string $email, string $code): bool
     return mail($email, $subject, $message, implode("\r\n", $headers));
 }
 
+function sendLoginCodeEmail(string $email, string $code): bool
+{
+    $subject = 'Kod logowania Budowa domu';
+    $message = "Twoj kod logowania to: {$code}\n\nKod jest wazny 5 minut.";
+    $headers = [
+        'Content-Type: text/plain; charset=UTF-8',
+        'From: Budowa domu <no-reply@macbook.host>',
+    ];
+
+    return mail($email, $subject, $message, implode("\r\n", $headers));
+}
+
+function investorEmails(array $settings): array
+{
+    $investors = is_array($settings['investors'] ?? null) ? $settings['investors'] : [];
+    return array_values(array_filter([
+        cleanEmail($investors['primaryEmail'] ?? ''),
+        cleanEmail($investors['partnerEmail'] ?? ''),
+    ]));
+}
+
+function isInvestorEmail(array $settings, string $email): bool
+{
+    return in_array(cleanEmail($email), investorEmails($settings), true);
+}
+
 function cookieOptions(int $expires): array
 {
     return [
@@ -808,6 +834,66 @@ try {
         }
 
         respond(['message' => 'Niepoprawny email lub haslo.'], 401);
+    }
+
+    if ($resource === 'auth' && $method === 'POST' && $action === 'email-login-start') {
+        $body = readJsonBody();
+        $email = cleanEmail($body['email'] ?? '');
+        $message = 'Jeśli adres jest uprawniony, wysłaliśmy kod logowania.';
+        $store = getUsers($usersFile);
+
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) && isInvestorEmail($state['settings'] ?? [], $email)) {
+            $code = generateCode();
+            $store['pendingEmailLogin'] = [
+                'email' => $email,
+                'codeHash' => password_hash($code, PASSWORD_DEFAULT),
+                'attemptsLeft' => 5,
+                'expiresAt' => time() + 60 * 5,
+            ];
+            writeStorageFile($usersFile, $store);
+
+            if (!sendLoginCodeEmail($email, $code)) {
+                respond(['message' => 'Nie udalo sie wyslac kodu email. Sprawdz konfiguracje poczty na hostingu.'], 500);
+            }
+
+            respond(['message' => $message]);
+        }
+
+        $store['pendingEmailLogin'] = null;
+        writeStorageFile($usersFile, $store);
+        respond(['message' => $message]);
+    }
+
+    if ($resource === 'auth' && $method === 'POST' && $action === 'email-login-verify') {
+        $body = readJsonBody();
+        $email = cleanEmail($body['email'] ?? '');
+        $code = trim((string)($body['code'] ?? ''));
+        $store = getUsers($usersFile);
+        $pending = $store['pendingEmailLogin'] ?? null;
+
+        if (
+            !is_array($pending)
+            || ($pending['email'] ?? '') !== $email
+            || !isInvestorEmail($state['settings'] ?? [], $email)
+            || (int)($pending['expiresAt'] ?? 0) < time()
+            || (int)($pending['attemptsLeft'] ?? 0) <= 0
+        ) {
+            $store['pendingEmailLogin'] = null;
+            writeStorageFile($usersFile, $store);
+            respond(['message' => 'Kod wygasl albo jest niepoprawny. Wyslij nowy kod.'], 400);
+        }
+
+        if (!password_verify($code, (string)($pending['codeHash'] ?? ''))) {
+            $pending['attemptsLeft'] = (int)($pending['attemptsLeft'] ?? 0) - 1;
+            $store['pendingEmailLogin'] = $pending['attemptsLeft'] > 0 ? $pending : null;
+            writeStorageFile($usersFile, $store);
+            respond(['message' => 'Kod wygasl albo jest niepoprawny. Wyslij nowy kod.'], 400);
+        }
+
+        $store['pendingEmailLogin'] = null;
+        writeStorageFile($usersFile, $store);
+        createSession($sessionsFile, $email);
+        respond(['authenticated' => true, 'setupRequired' => false, 'email' => $email]);
     }
 
     if ($resource === 'auth' && $method === 'POST' && $action === 'logout') {

@@ -486,10 +486,11 @@ async function writeStorageFile(file, payload) {
 }
 
 async function getUsers() {
-  const store = await readStorageFile(usersFile, { users: [], pendingRegistration: null })
+  const store = await readStorageFile(usersFile, { users: [], pendingRegistration: null, pendingEmailLogin: null })
   return {
     users: Array.isArray(store.users) ? store.users : [],
     pendingRegistration: store.pendingRegistration || null,
+    pendingEmailLogin: store.pendingEmailLogin || null,
   }
 }
 
@@ -516,6 +517,17 @@ function verifySecret(secret, storedHash) {
 
 function generateCode() {
   return String(randomInt(100000, 1000000))
+}
+
+function investorEmails(settings = {}) {
+  return [
+    cleanEmail(settings.investors?.primaryEmail),
+    cleanEmail(settings.investors?.partnerEmail),
+  ].filter(Boolean)
+}
+
+function isInvestorEmail(settings, email) {
+  return investorEmails(settings).includes(cleanEmail(email))
 }
 
 function parseCookies(cookieHeader = '') {
@@ -721,6 +733,73 @@ app.post('/api/auth/login', async (request, response, next) => {
 
     await createSession(request, response, email)
     response.json({ authenticated: true, email })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/auth/email-login-start', async (request, response, next) => {
+  try {
+    const email = cleanEmail(request.body.email)
+    const state = await readState()
+    const store = await getUsers()
+    const message = 'Jeśli adres jest uprawniony, wysłaliśmy kod logowania.'
+    let developmentCode
+
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && isInvestorEmail(state.settings, email)) {
+      const code = generateCode()
+      store.pendingEmailLogin = {
+        email,
+        codeHash: hashSecret(code),
+        attemptsLeft: 5,
+        expiresAt: Date.now() + 1000 * 60 * 5,
+      }
+      developmentCode = process.env.NODE_ENV === 'production' ? undefined : code
+      console.log(`Kod logowania Budowa domu dla ${email}: ${code}`)
+    } else {
+      store.pendingEmailLogin = null
+    }
+
+    await writeStorageFile(usersFile, store)
+    response.json({ message, developmentCode })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/auth/email-login-verify', async (request, response, next) => {
+  try {
+    const email = cleanEmail(request.body.email)
+    const code = String(request.body.code || '').trim()
+    const state = await readState()
+    const store = await getUsers()
+    const pending = store.pendingEmailLogin
+
+    if (
+      !pending
+      || pending.email !== email
+      || !isInvestorEmail(state.settings, email)
+      || Number(pending.expiresAt) < Date.now()
+      || Number(pending.attemptsLeft) <= 0
+    ) {
+      store.pendingEmailLogin = null
+      await writeStorageFile(usersFile, store)
+      response.status(400).json({ message: 'Kod wygasl albo jest niepoprawny. Wyslij nowy kod.' })
+      return
+    }
+
+    if (!verifySecret(code, pending.codeHash)) {
+      pending.attemptsLeft = Number(pending.attemptsLeft) - 1
+      store.pendingEmailLogin = pending.attemptsLeft > 0 ? pending : null
+      await writeStorageFile(usersFile, store)
+      response.status(400).json({ message: 'Kod wygasl albo jest niepoprawny. Wyslij nowy kod.' })
+      return
+    }
+
+    store.pendingEmailLogin = null
+    await writeStorageFile(usersFile, store)
+    await createSession(request, response, email)
+    response.json({ authenticated: true, setupRequired: false, email })
   } catch (error) {
     next(error)
   }
