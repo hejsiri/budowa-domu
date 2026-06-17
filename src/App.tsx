@@ -19,6 +19,7 @@ import {
   StickyNote,
   SquarePen,
   Trash,
+  Wallet,
   X,
 } from 'lucide-react'
 import './App.css'
@@ -26,7 +27,7 @@ import './App.css'
 type TaskStatus = 'todo' | 'done'
 type PaymentStatus = 'planned' | 'unpaid' | 'paid'
 type CostPayer = 'me' | 'partner' | 'half' | 'custom'
-type ActiveSection = 'tasks' | 'costs'
+type ActiveSection = 'tasks' | 'costs' | 'wallet'
 type AuthMode = 'login' | 'register' | 'verify'
 type TaskView = TaskStatus | 'all'
 type CostView = PaymentStatus | 'all'
@@ -81,8 +82,17 @@ type Cost = {
   commentHtml?: string
   status: PaymentStatus
   paidDate: string
+  walletTransactionId?: string
   attachment?: Attachment
   attachments?: Attachment[]
+}
+
+type WalletTransaction = {
+  id: string
+  date: string
+  description: string
+  amount: number
+  costId?: string
 }
 
 type SettingsState = {
@@ -98,6 +108,9 @@ type SettingsState = {
 type AppState = {
   tasks: Task[]
   costs: Cost[]
+  wallet?: {
+    transactions: WalletTransaction[]
+  }
   settings?: SettingsState
 }
 
@@ -116,7 +129,8 @@ const defaultSettings: SettingsState = {
   calendarToken: '',
 }
 
-const emptyState: AppState = { tasks: [], costs: [], settings: defaultSettings }
+const emptyWallet = { transactions: [] as WalletTransaction[] }
+const emptyState: AppState = { tasks: [], costs: [], wallet: emptyWallet, settings: defaultSettings }
 const savedActiveSectionKey = 'budowa.activeSection'
 const savedTaskViewKey = 'budowa.taskView'
 const savedCostViewKey = 'budowa.costView'
@@ -243,7 +257,7 @@ function apiEndpoint(resource: string, id?: string, action?: string) {
       return action ? `/api/auth/${action}` : '/api/auth'
     }
 
-    const suffix = id ? `/${id}${action ? `/${action}` : ''}` : ''
+    const suffix = id ? `/${id}${action ? `/${action}` : ''}` : action ? `/${action}` : ''
     return `/api/${resource}${suffix}`
   }
 
@@ -451,7 +465,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeSection, setActiveSection] = useState<ActiveSection>(() => {
-    return readSavedSetting<ActiveSection>(savedActiveSectionKey, 'tasks', ['tasks', 'costs'])
+    return readSavedSetting<ActiveSection>(savedActiveSectionKey, 'tasks', ['tasks', 'costs', 'wallet'])
   })
   const [taskView, setTaskView] = useState<TaskView>(() => {
     return readSavedSetting<TaskView>(savedTaskViewKey, 'todo', ['todo', 'done', 'all'])
@@ -459,7 +473,7 @@ function App() {
   const [costView, setCostView] = useState<CostView>(() => {
     return readSavedSetting<CostView>(savedCostViewKey, 'all', ['planned', 'unpaid', 'paid', 'all'])
   })
-  const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'settings' | null>(null)
+  const [activeModal, setActiveModal] = useState<'task' | 'cost' | 'wallet' | 'settings' | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<Attachment | null>(null)
   const [attachmentGroupPreview, setAttachmentGroupPreview] = useState<AttachmentGroupPreview | null>(null)
   const [imageGalleryPreview, setImageGalleryPreview] = useState<ImageGalleryPreview | null>(null)
@@ -496,6 +510,12 @@ function App() {
     commentHtml: '',
     status: 'planned' as PaymentStatus,
     paidDate: '',
+    useWallet: false,
+  })
+  const [walletForm, setWalletForm] = useState({
+    date: today,
+    description: '',
+    amount: '',
   })
   const [settingsForm, setSettingsForm] = useState(defaultSettings.investors)
   const [passwordForm, setPasswordForm] = useState({
@@ -513,7 +533,7 @@ function App() {
 
     try {
       const nextState = await requestJson<AppState>(apiEndpoint('state'))
-      setState({ ...nextState, settings: nextState.settings || defaultSettings })
+      setState({ ...nextState, wallet: nextState.wallet || emptyWallet, settings: nextState.settings || defaultSettings })
       setSettingsForm((nextState.settings || defaultSettings).investors)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Nie udalo sie pobrac danych.')
@@ -642,10 +662,19 @@ function App() {
       commentHtml: '',
       status: 'planned',
       paidDate: '',
+      useWallet: false,
     })
     setCostDocumentFiles([])
     setCostImageFiles([])
     setCostRemovePaths([])
+  }
+
+  function resetWalletForm() {
+    setWalletForm({
+      date: today,
+      description: '',
+      amount: '',
+    })
   }
 
   function closeModal() {
@@ -736,6 +765,11 @@ function App() {
     setActiveModal('cost')
   }
 
+  function openWalletModal() {
+    resetWalletForm()
+    setActiveModal('wallet')
+  }
+
   function openEditCostModal(cost: Cost) {
     const split = costSplit(cost, settings)
     const investorAmount = (cost.amount * split.investorShare) / 100
@@ -753,6 +787,7 @@ function App() {
       commentHtml: sanitizeRichTextHtml(cost.commentHtml || ''),
       status: cost.status,
       paidDate: cost.paidDate,
+      useWallet: Boolean(cost.walletTransactionId),
     })
     setCostDocumentFiles([])
     setCostImageFiles([])
@@ -776,6 +811,8 @@ function App() {
     const planned = plannedCosts.reduce((sum, cost) => sum + cost.amount, 0)
     const total = paid + unpaid + planned
     const paidProgress = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0
+    const walletTransactions = state.wallet?.transactions || []
+    const walletBalance = walletTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
 
     return {
       total,
@@ -783,6 +820,8 @@ function App() {
       paidProgress,
       unpaid,
       unpaidCostCount: unpaidCosts.length,
+      walletBalance,
+      walletTransactionCount: walletTransactions.length,
       paidInvestor: paidCosts.reduce((sum, cost) => {
         return sum + (cost.amount * costSplit(cost, settings).investorShare) / 100
       }, 0),
@@ -792,7 +831,7 @@ function App() {
       todoTasks: state.tasks.filter((task) => task.status === 'todo').length,
       doneTasks: state.tasks.filter((task) => task.status === 'done').length,
     }
-  }, [settings, state.costs, state.tasks])
+  }, [settings, state.costs, state.tasks, state.wallet])
 
   const filteredTasks = state.tasks.filter((task) => {
     return taskView === 'all' ? true : task.status === taskView
@@ -806,10 +845,10 @@ function App() {
   const editingTaskAttachments = (editingTask?.attachments || []).filter((attachment) => !taskRemovePaths.includes(attachment.path))
   const editingCostAttachments = editingCost ? costAttachments(editingCost).filter((attachment) => !costRemovePaths.includes(attachment.path)) : []
 
-  async function runServerAction(action: () => Promise<AppState | Task | Cost>) {
+  async function runServerAction(action: () => Promise<AppState | Task | Cost | WalletTransaction>) {
     setError('')
 
-    let result: AppState | Task | Cost
+    let result: AppState | Task | Cost | WalletTransaction
     try {
       result = await action()
     } catch (requestError) {
@@ -819,7 +858,7 @@ function App() {
 
     try {
       if ('tasks' in result && 'costs' in result) {
-        setState({ ...result, settings: result.settings || settings })
+        setState({ ...result, wallet: result.wallet || emptyWallet, settings: result.settings || settings })
       } else {
         await refreshState()
       }
@@ -842,6 +881,10 @@ function App() {
   function cleanAmountInput(value: string) {
     const digits = value.replace(/\D/g, '')
     return digits ? formatWithThousands(Number(digits)) : ''
+  }
+
+  function transactionAmountClass(amount: number) {
+    return amount < 0 ? 'wallet-amount-negative' : 'wallet-amount-positive'
   }
 
   function setCostPayer(payer: CostPayer) {
@@ -1030,6 +1073,7 @@ function App() {
     body.append('commentHtml', sanitizeRichTextHtml(costCommentRef.current?.innerHTML || costForm.commentHtml))
     body.append('status', costForm.status)
     body.append('paidDate', costForm.paidDate)
+    body.append('useWallet', costForm.status === 'paid' && costForm.useWallet ? '1' : '0')
     body.append('removeAttachments', JSON.stringify(costRemovePaths))
     costDocumentFiles.forEach((file) => body.append('documents[]', file))
     costImageFiles.forEach((file) => body.append('images[]', file))
@@ -1042,6 +1086,30 @@ function App() {
     )
     if (saved) {
       resetCostForm()
+      closeModal()
+    }
+  }
+
+  async function addWalletTransaction(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const amount = parseAmountInput(walletForm.amount)
+    if (!walletForm.description.trim() || !Number.isFinite(amount) || amount <= 0) {
+      return
+    }
+
+    const body = new FormData()
+    body.append('date', walletForm.date)
+    body.append('description', walletForm.description)
+    body.append('amount', String(amount))
+
+    const saved = await runServerAction(() =>
+      requestJson<WalletTransaction | AppState>(apiEndpoint('wallet', undefined, 'transactions'), {
+        method: 'POST',
+        body,
+      }),
+    )
+    if (saved) {
+      resetWalletForm()
       closeModal()
     }
   }
@@ -1391,6 +1459,11 @@ function App() {
               {formatInteger(summary.unpaidCostCount)} pozycji
             </small>
           </article>
+          <article className="stat-panel wallet-summary">
+            <span>Portfel</span>
+            <strong>{formatCurrency(summary.walletBalance)}</strong>
+            <small>{formatInteger(summary.walletTransactionCount)} transakcji</small>
+          </article>
         </section>
 
         <nav className="section-tabs" aria-label="Widok panelu" role="tablist">
@@ -1417,6 +1490,17 @@ function App() {
             <BanknoteArrowDown size={18} />
             Wydatki
             {summary.unpaidCostCount > 0 && <span className="tab-count">{formatInteger(summary.unpaidCostCount)}</span>}
+          </button>
+          <button
+            className={activeSection === 'wallet' ? 'active' : ''}
+            role="tab"
+            aria-selected={activeSection === 'wallet'}
+            aria-controls="wallet-panel"
+            id="wallet-tab"
+            onClick={() => setActiveSection('wallet')}
+          >
+            <Wallet size={18} />
+            Portfel
           </button>
         </nav>
       </header>
@@ -1644,6 +1728,52 @@ function App() {
           </div>
         </section>
         )}
+
+        {activeSection === 'wallet' && (
+        <section className="module" id="wallet-panel" role="tabpanel" aria-labelledby="wallet-tab">
+          <div className="module-heading">
+            <div className="module-title">
+              <Wallet size={24} />
+              <div>
+                <p>Portfel inwestycji</p>
+                <h2>Środki odłożone na koncie</h2>
+              </div>
+            </div>
+            <div className="module-actions">
+              <button className="heading-action" onClick={openWalletModal}>
+                <Plus size={18} />
+                <span className="heading-action-label">Dodaj środki</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="wallet-balance-strip">
+            <span>Saldo Portfela</span>
+            <strong>{formatCurrency(summary.walletBalance)}</strong>
+          </div>
+
+          <div className="list">
+            {isLoading ? <p className="empty">Ładuję historię Portfela...</p> : null}
+            {!isLoading && (state.wallet?.transactions || []).length === 0 ? (
+              <p className="empty">Brak transakcji w Portfelu.</p>
+            ) : null}
+            {(state.wallet?.transactions || []).map((transaction) => (
+              <article className="item-card wallet-card" key={transaction.id}>
+                <div className="item-main">
+                  <div className="item-title-row">
+                    <h3>{transaction.description}</h3>
+                    <strong className={`wallet-amount ${transactionAmountClass(transaction.amount)}`}>
+                      {transaction.amount < 0 ? '-' : '+'}
+                      {formatCurrency(Math.abs(transaction.amount))}
+                    </strong>
+                  </div>
+                  <p>{transaction.date || 'bez daty'}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+        )}
       </section>
 
       <footer className="app-footer">
@@ -1674,6 +1804,8 @@ function App() {
                     ? 'Zadania budowy'
                     : activeModal === 'cost'
                       ? 'Wydatki budowy'
+                      : activeModal === 'wallet'
+                        ? 'Portfel inwestycji'
                       : 'Konfiguracja'}
                 </p>
                 <h2 id="modal-title">
@@ -1685,6 +1817,8 @@ function App() {
                       ? editingCostId
                         ? 'Edytuj wydatek'
                         : 'Dodaj wydatek'
+                      : activeModal === 'wallet'
+                        ? 'Dodaj środki'
                       : 'Ustawienia'}
                 </h2>
               </div>
@@ -1777,6 +1911,45 @@ function App() {
                   <button type="submit" className="primary-action">
                     <Check size={18} />
                     Zapisz ustawienia
+                  </button>
+                </div>
+              </form>
+            ) : activeModal === 'wallet' ? (
+              <form className="entry-form modal-form" onSubmit={addWalletTransaction}>
+                <label>
+                  <span>Data</span>
+                  <input
+                    type="date"
+                    value={walletForm.date}
+                    onChange={(event) => setWalletForm({ ...walletForm, date: event.target.value })}
+                    autoFocus
+                  />
+                </label>
+                <label>
+                  <span>Kwota PLN</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={walletForm.amount}
+                    onChange={(event) => setWalletForm({ ...walletForm, amount: cleanAmountInput(event.target.value) })}
+                    placeholder="0"
+                  />
+                </label>
+                <label className="wide">
+                  <span>Opis transakcji</span>
+                  <input
+                    value={walletForm.description}
+                    onChange={(event) => setWalletForm({ ...walletForm, description: event.target.value })}
+                    placeholder="np. Przelew na konto inwestycyjne"
+                  />
+                </label>
+                <div className="modal-actions">
+                  <button type="button" className="secondary-action" onClick={closeModal}>
+                    Anuluj
+                  </button>
+                  <button type="submit" className="primary-action">
+                    <Plus size={18} />
+                    Dodaj środki
                   </button>
                 </div>
               </form>
@@ -1999,6 +2172,15 @@ function App() {
                     disabled={costForm.status !== 'paid'}
                     onChange={(event) => setCostForm({ ...costForm, paidDate: event.target.value })}
                   />
+                </label>
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={costForm.useWallet}
+                    disabled={costForm.status !== 'paid'}
+                    onChange={(event) => setCostForm({ ...costForm, useWallet: event.target.checked })}
+                  />
+                  <span>Pobierz środki z Portfela</span>
                 </label>
                 <div className="quick-split wide" aria-label="Szybkie ustawienia płatności">
                   <button type="button" className={costForm.payer === 'me' ? 'active' : ''} onClick={() => setCostPayer('me')}>

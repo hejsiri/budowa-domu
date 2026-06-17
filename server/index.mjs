@@ -83,6 +83,9 @@ const initialState = {
       paidDate: '',
     },
   ],
+  wallet: {
+    transactions: [],
+  },
   settings: {
     investors: {
       primary: 'Ja',
@@ -144,13 +147,15 @@ async function readState() {
   const content = await fs.readFile(dataFile, 'utf8')
   const state = JSON.parse(content)
   const hadCalendarToken = Boolean(cleanText(state.settings?.calendarToken))
+  const hadWallet = Boolean(state.wallet)
   const nextState = {
     ...state,
     tasks: Array.isArray(state.tasks) ? state.tasks.map(normalizeTask) : [],
+    wallet: normalizeWallet(state.wallet),
     settings: normalizeSettings(state.settings),
   }
 
-  if (!hadCalendarToken) {
+  if (!hadCalendarToken || !hadWallet) {
     await writeState(nextState)
   }
 
@@ -298,6 +303,75 @@ function cleanPayer(value) {
 function cleanShare(value, fallback) {
   const share = Number(value)
   return Number.isFinite(share) ? Math.min(100, Math.max(0, share)) : fallback
+}
+
+function cleanAmount(value, fallback = 0) {
+  const amount = Number(value)
+  return Number.isFinite(amount) ? amount : fallback
+}
+
+function isChecked(value) {
+  return ['1', 'true', 'on', 'yes'].includes(String(value || '').toLowerCase())
+}
+
+function normalizeWalletTransaction(transaction = {}) {
+  return {
+    ...transaction,
+    id: cleanText(transaction.id, randomUUID()),
+    date: cleanText(transaction.date, getToday()),
+    description: cleanText(transaction.description, 'Transakcja Portfela'),
+    amount: cleanAmount(transaction.amount),
+    costId: cleanText(transaction.costId),
+  }
+}
+
+function normalizeWallet(wallet = {}) {
+  return {
+    transactions: Array.isArray(wallet.transactions) ? wallet.transactions.map(normalizeWalletTransaction) : [],
+  }
+}
+
+function walletTransactionForCost(cost, transactionId = randomUUID()) {
+  return {
+    id: transactionId,
+    date: cleanText(cost.paidDate, getToday()),
+    description: `Płatność: ${cost.title}`,
+    amount: -Math.abs(cleanAmount(cost.amount)),
+    costId: cost.id,
+  }
+}
+
+function syncCostWalletTransaction(state, cost, shouldUseWallet) {
+  state.wallet = normalizeWallet(state.wallet)
+  const currentTransactionId = cleanText(cost.walletTransactionId)
+
+  if (cleanCostStatus(cost.status) !== 'paid' || !shouldUseWallet) {
+    if (currentTransactionId) {
+      state.wallet.transactions = state.wallet.transactions.filter((transaction) => transaction.id !== currentTransactionId)
+      delete cost.walletTransactionId
+    }
+    return
+  }
+
+  if (currentTransactionId) {
+    let updatedExistingTransaction = false
+    state.wallet.transactions = state.wallet.transactions.map((transaction) => {
+      if (transaction.id !== currentTransactionId) {
+        return transaction
+      }
+
+      updatedExistingTransaction = true
+      return walletTransactionForCost(cost, currentTransactionId)
+    })
+    if (!updatedExistingTransaction) {
+      state.wallet.transactions = [walletTransactionForCost(cost, currentTransactionId), ...state.wallet.transactions]
+    }
+    return
+  }
+
+  const transaction = walletTransactionForCost(cost)
+  cost.walletTransactionId = transaction.id
+  state.wallet.transactions = [transaction, ...state.wallet.transactions]
 }
 
 function paymentSplitFromBody(body) {
@@ -693,6 +767,31 @@ app.post('/api/settings', async (request, response, next) => {
   }
 })
 
+app.post('/api/wallet/transactions', upload.none(), async (request, response, next) => {
+  try {
+    const state = await readState()
+    const amount = cleanAmount(request.body.amount)
+    const transaction = {
+      id: randomUUID(),
+      date: cleanText(request.body.date, getToday()),
+      description: cleanText(request.body.description),
+      amount: Math.abs(amount),
+    }
+
+    if (!transaction.description || !Number.isFinite(amount) || amount <= 0) {
+      response.status(400).json({ message: 'Podaj opis i prawidlowa kwote transakcji.' })
+      return
+    }
+
+    state.wallet = normalizeWallet(state.wallet)
+    state.wallet.transactions = [transaction, ...state.wallet.transactions]
+    await writeState(state)
+    response.status(201).json(transaction)
+  } catch (error) {
+    next(error)
+  }
+})
+
 app.get('/api/file', async (request, response, next) => {
   try {
     const relativePath = String(request.query.path || '').replace(/^\//, '')
@@ -879,6 +978,7 @@ app.post('/api/costs', attachmentUpload, async (request, response, next) => {
       return
     }
 
+    syncCostWalletTransaction(state, cost, isChecked(request.body.useWallet))
     state.costs = [cost, ...state.costs]
     await writeState(state)
     response.status(201).json(cost)
@@ -919,6 +1019,7 @@ async function updateCost(request, response, next) {
         attachments: [...filterRemovedAttachments(currentAttachments, removePaths), ...attachments],
       }
       delete updatedCost.attachment
+      syncCostWalletTransaction(state, updatedCost, isChecked(request.body.useWallet))
       deleteAttachments(removedAttachments).catch(() => undefined)
 
       return updatedCost
@@ -942,19 +1043,24 @@ app.post('/api/costs/:id', attachmentUpload, updateCost)
 app.patch('/api/costs/:id/toggle', async (request, response, next) => {
   try {
     const state = await readState()
-    state.costs = state.costs.map((cost) =>
-      cost.id === request.params.id
-        ? {
-            ...cost,
-            status: cleanCostStatus(cost.status) === 'planned'
-              ? 'unpaid'
-              : cleanCostStatus(cost.status) === 'paid'
-                ? 'unpaid'
-                : 'paid',
-            paidDate: cleanCostStatus(cost.status) === 'unpaid' ? getToday() : '',
-          }
-        : cost,
-    )
+    state.costs = state.costs.map((cost) => {
+      if (cost.id !== request.params.id) {
+        return cost
+      }
+
+      const currentStatus = cleanCostStatus(cost.status)
+      const updatedCost = {
+        ...cost,
+        status: currentStatus === 'planned'
+          ? 'unpaid'
+          : currentStatus === 'paid'
+            ? 'unpaid'
+            : 'paid',
+        paidDate: currentStatus === 'unpaid' ? getToday() : '',
+      }
+      syncCostWalletTransaction(state, updatedCost, false)
+      return updatedCost
+    })
     await writeState(state)
     response.json(state)
   } catch (error) {
@@ -969,6 +1075,10 @@ app.delete('/api/costs/:id', async (request, response, next) => {
     const state = await readState()
     const cost = state.costs.find((item) => item.id === request.params.id)
     state.costs = state.costs.filter((item) => item.id !== request.params.id)
+    if (cost?.walletTransactionId) {
+      state.wallet = normalizeWallet(state.wallet)
+      state.wallet.transactions = state.wallet.transactions.filter((transaction) => transaction.id !== cost.walletTransactionId)
+    }
     await writeState(state)
 
     await deleteAttachments(cost?.attachments)

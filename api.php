@@ -89,6 +89,9 @@ $initialState = [
             'paidDate' => '',
         ],
     ],
+    'wallet' => [
+        'transactions' => [],
+    ],
     'settings' => [
         'investors' => [
             'primary' => 'Ja',
@@ -269,9 +272,11 @@ function readState(string $dataFile): array
     }
 
     $hadCalendarToken = cleanText($state['settings']['calendarToken'] ?? '') !== '';
+    $hadWallet = isset($state['wallet']) && is_array($state['wallet']);
     $state['settings'] = normalizeSettings($state['settings'] ?? []);
     $state['tasks'] = array_map('normalizeTask', is_array($state['tasks'] ?? null) ? $state['tasks'] : []);
-    if (!$hadCalendarToken) {
+    $state['wallet'] = normalizeWallet($state['wallet'] ?? []);
+    if (!$hadCalendarToken || !$hadWallet) {
         writeState($dataFile, $state);
     }
     return $state;
@@ -329,6 +334,85 @@ function cleanCostStatus($value): string
 {
     $status = cleanText($value ?? '', 'planned');
     return in_array($status, ['planned', 'unpaid', 'paid'], true) ? $status : 'planned';
+}
+
+function cleanAmount($value, float $fallback = 0): float
+{
+    $amount = (float)($value ?? $fallback);
+    return is_finite($amount) ? $amount : $fallback;
+}
+
+function isChecked($value): bool
+{
+    return in_array(strtolower((string)($value ?? '')), ['1', 'true', 'on', 'yes'], true);
+}
+
+function normalizeWalletTransaction($transaction): array
+{
+    $transaction = is_array($transaction) ? $transaction : [];
+    $transaction['id'] = cleanText($transaction['id'] ?? '', uuid());
+    $transaction['date'] = cleanText($transaction['date'] ?? '', date('Y-m-d'));
+    $transaction['description'] = cleanText($transaction['description'] ?? '', 'Transakcja Portfela');
+    $transaction['amount'] = cleanAmount($transaction['amount'] ?? 0);
+    $transaction['costId'] = cleanText($transaction['costId'] ?? '');
+    return $transaction;
+}
+
+function normalizeWallet($wallet): array
+{
+    $transactions = is_array($wallet['transactions'] ?? null) ? $wallet['transactions'] : [];
+    return [
+        'transactions' => array_map('normalizeWalletTransaction', $transactions),
+    ];
+}
+
+function walletTransactionForCost(array $cost, string $transactionId = ''): array
+{
+    return [
+        'id' => $transactionId !== '' ? $transactionId : uuid(),
+        'date' => cleanText($cost['paidDate'] ?? '', date('Y-m-d')),
+        'description' => 'Płatność: ' . cleanText($cost['title'] ?? '', 'Wydatek'),
+        'amount' => -abs(cleanAmount($cost['amount'] ?? 0)),
+        'costId' => cleanText($cost['id'] ?? ''),
+    ];
+}
+
+function syncCostWalletTransaction(array &$state, array &$cost, bool $shouldUseWallet)
+{
+    $state['wallet'] = normalizeWallet($state['wallet'] ?? []);
+    $currentTransactionId = cleanText($cost['walletTransactionId'] ?? '');
+
+    if (cleanCostStatus($cost['status'] ?? '') !== 'paid' || !$shouldUseWallet) {
+        if ($currentTransactionId !== '') {
+            $state['wallet']['transactions'] = array_values(array_filter(
+                $state['wallet']['transactions'],
+                static function (array $transaction) use ($currentTransactionId): bool {
+                    return (string)($transaction['id'] ?? '') !== $currentTransactionId;
+                }
+            ));
+            unset($cost['walletTransactionId']);
+        }
+        return;
+    }
+
+    if ($currentTransactionId !== '') {
+        $updatedExistingTransaction = false;
+        foreach ($state['wallet']['transactions'] as &$transaction) {
+            if ((string)($transaction['id'] ?? '') === $currentTransactionId) {
+                $transaction = walletTransactionForCost($cost, $currentTransactionId);
+                $updatedExistingTransaction = true;
+            }
+        }
+        unset($transaction);
+        if (!$updatedExistingTransaction) {
+            array_unshift($state['wallet']['transactions'], walletTransactionForCost($cost, $currentTransactionId));
+        }
+        return;
+    }
+
+    $transaction = walletTransactionForCost($cost);
+    $cost['walletTransactionId'] = $transaction['id'];
+    array_unshift($state['wallet']['transactions'], $transaction);
 }
 
 function normalizeTask($task): array
@@ -731,6 +815,25 @@ try {
         respond($state);
     }
 
+    if ($resource === 'wallet' && $method === 'POST' && $action === 'transactions') {
+        $amount = cleanAmount($_POST['amount'] ?? 0);
+        $transaction = [
+            'id' => uuid(),
+            'date' => cleanText($_POST['date'] ?? '', date('Y-m-d')),
+            'description' => cleanText($_POST['description'] ?? ''),
+            'amount' => abs($amount),
+        ];
+
+        if ($transaction['description'] === '' || $amount <= 0) {
+            respond(['message' => 'Podaj opis i prawidlowa kwote transakcji.'], 400);
+        }
+
+        $state['wallet'] = normalizeWallet($state['wallet'] ?? []);
+        array_unshift($state['wallet']['transactions'], $transaction);
+        writeState($dataFile, $state);
+        respond($transaction, 201);
+    }
+
     if ($resource === 'file' && $method === 'GET') {
         $relativePath = ltrim((string)($_GET['path'] ?? ''), '/');
         $fileName = basename($relativePath);
@@ -905,6 +1008,7 @@ try {
                     $cost['paidDate'] = $status === 'paid' ? cleanText($_POST['paidDate'] ?? '', date('Y-m-d')) : '';
                     $cost['attachments'] = array_values(array_merge($existingAttachments, $attachments));
                     unset($cost['attachment']);
+                    syncCostWalletTransaction($state, $cost, isChecked($_POST['useWallet'] ?? ''));
                 }
             }
             unset($cost);
@@ -929,6 +1033,7 @@ try {
             'attachments' => $attachments,
         ];
 
+        syncCostWalletTransaction($state, $cost, isChecked($_POST['useWallet'] ?? ''));
         array_unshift($state['costs'], $cost);
         writeState($dataFile, $state);
         respond($cost, 201);
@@ -948,6 +1053,7 @@ try {
                     $cost['status'] = 'paid';
                     $cost['paidDate'] = date('Y-m-d');
                 }
+                syncCostWalletTransaction($state, $cost, false);
             }
         }
         unset($cost);
@@ -970,6 +1076,16 @@ try {
         ));
 
         if (is_array($deleted)) {
+            $walletTransactionId = cleanText($deleted['walletTransactionId'] ?? '');
+            if ($walletTransactionId !== '') {
+                $state['wallet'] = normalizeWallet($state['wallet'] ?? []);
+                $state['wallet']['transactions'] = array_values(array_filter(
+                    $state['wallet']['transactions'],
+                    static function (array $transaction) use ($walletTransactionId): bool {
+                        return (string)($transaction['id'] ?? '') !== $walletTransactionId;
+                    }
+                ));
+            }
             deleteAttachmentFiles(costAttachments($deleted));
         }
 

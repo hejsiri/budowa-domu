@@ -350,7 +350,7 @@ label > span {
   z-index: 1;
   display: grid;
   width: min(1040px, 100%);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 30px auto 0;
 }
@@ -536,6 +536,57 @@ label > span {
   text-overflow: ellipsis;
   text-transform: none;
   white-space: nowrap;
+}
+
+.wallet-balance-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 16px;
+  border: 1px solid #cfe0d7;
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: #145637;
+  background: #e8f6ee;
+}
+
+.wallet-balance-strip span {
+  color: #37674c;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wallet-balance-strip strong {
+  color: #145637;
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.wallet-card {
+  align-items: center;
+}
+
+.wallet-amount {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.wallet-amount-positive {
+  color: #145637;
+  background: #e8f6ee;
+}
+
+.wallet-amount-negative {
+  color: #873426;
+  background: #fff0ed;
 }
 
 .workspace {

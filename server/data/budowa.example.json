@@ -243,6 +243,9 @@
       "paidDate": "2026-06-05"
     }
   ],
+  "wallet": {
+    "transactions": []
+  },
   "settings": {
     "investors": {
       "primary": "Ja",
