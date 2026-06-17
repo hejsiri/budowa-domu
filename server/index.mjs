@@ -1,7 +1,7 @@
 import express from 'express'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
+import { randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import multer from 'multer'
 
@@ -17,6 +17,18 @@ const exampleDataFile = path.join(__dirname, 'data', 'budowa.example.json')
 const sessionCookieName = 'budowa_session'
 const port = Number(process.env.PORT || 4174)
 const richTextLimit = 50000
+const privateDirectoryMode = 0o750
+const privateFileMode = 0o640
+const allowedUploadExtensions = new Set(['.avif', '.csv', '.doc', '.docx', '.gif', '.heic', '.heif', '.jpeg', '.jpg', '.pdf', '.png', '.txt', '.webp', '.xls', '.xlsx'])
+const allowedUploadMimeTypes = new Set([
+  'application/msword',
+  'application/pdf',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/csv',
+  'text/plain',
+])
 
 const initialState = {
   tasks: [
@@ -99,7 +111,7 @@ const initialState = {
 
 const storage = multer.diskStorage({
   destination: async (_request, _file, callback) => {
-    await fs.mkdir(uploadsDir, { recursive: true })
+    await ensurePrivateDirectory(uploadsDir)
     callback(null, uploadsDir)
   },
   filename: (_request, file, callback) => {
@@ -121,11 +133,24 @@ const upload = multer({
   limits: {
     fileSize: 20 * 1024 * 1024,
   },
+  fileFilter: (_request, file, callback) => {
+    const extension = path.extname(file.originalname).toLowerCase()
+    const mimeType = String(file.mimetype || '').toLowerCase()
+    const allowed = allowedUploadExtensions.has(extension)
+      && (mimeType.startsWith('image/') || allowedUploadMimeTypes.has(mimeType))
+
+    callback(allowed ? null : new Error('Ten typ pliku nie jest dozwolony.'), allowed)
+  },
 })
 
+async function ensurePrivateDirectory(directory) {
+  await fs.mkdir(directory, { recursive: true, mode: privateDirectoryMode })
+  await fs.chmod(directory, privateDirectoryMode).catch(() => undefined)
+}
+
 async function ensureStorage() {
-  await fs.mkdir(storageDir, { recursive: true })
-  await fs.mkdir(uploadsDir, { recursive: true })
+  await ensurePrivateDirectory(storageDir)
+  await ensurePrivateDirectory(uploadsDir)
 
   try {
     await fs.access(dataFile)
@@ -163,8 +188,9 @@ async function readState() {
 }
 
 async function writeState(state) {
-  await fs.mkdir(storageDir, { recursive: true })
+  await ensurePrivateDirectory(storageDir)
   await fs.writeFile(dataFile, JSON.stringify(state, null, 2))
+  await fs.chmod(dataFile, privateFileMode).catch(() => undefined)
 }
 
 function cleanText(value, fallback = '') {
@@ -454,8 +480,9 @@ async function readStorageFile(file, fallback) {
 }
 
 async function writeStorageFile(file, payload) {
-  await fs.mkdir(path.dirname(file), { recursive: true })
+  await ensurePrivateDirectory(path.dirname(file))
   await fs.writeFile(file, JSON.stringify(payload, null, 2))
+  await fs.chmod(file, privateFileMode).catch(() => undefined)
 }
 
 async function getUsers() {
@@ -488,7 +515,7 @@ function verifySecret(secret, storedHash) {
 }
 
 function generateCode() {
-  return String(Math.floor(100000 + Math.random() * 900000))
+  return String(randomInt(100000, 1000000))
 }
 
 function parseCookies(cookieHeader = '') {
@@ -501,7 +528,11 @@ function parseCookies(cookieHeader = '') {
   )
 }
 
-function setSessionCookie(response, token, maxAgeSeconds) {
+function isSecureRequest(request) {
+  return request.secure || request.headers['x-forwarded-proto'] === 'https'
+}
+
+function setSessionCookie(request, response, token, maxAgeSeconds) {
   const parts = [
     `${sessionCookieName}=${encodeURIComponent(token)}`,
     'Path=/',
@@ -510,10 +541,14 @@ function setSessionCookie(response, token, maxAgeSeconds) {
     `Max-Age=${maxAgeSeconds}`,
   ]
 
+  if (isSecureRequest(request)) {
+    parts.push('Secure')
+  }
+
   response.setHeader('Set-Cookie', parts.join('; '))
 }
 
-async function createSession(response, email) {
+async function createSession(request, response, email) {
   const token = randomBytes(32).toString('hex')
   const sessions = await readStorageFile(sessionsFile, { sessions: [] })
   sessions.sessions = (sessions.sessions || []).filter((session) => Number(session.expiresAt) > Date.now())
@@ -524,7 +559,7 @@ async function createSession(response, email) {
   })
 
   await writeStorageFile(sessionsFile, sessions)
-  setSessionCookie(response, token, 60 * 60 * 24 * 14)
+  setSessionCookie(request, response, token, 60 * 60 * 24 * 14)
 }
 
 async function getCurrentUser(request) {
@@ -549,7 +584,7 @@ async function clearSession(request, response) {
     await writeStorageFile(sessionsFile, sessions)
   }
 
-  setSessionCookie(response, '', 0)
+  setSessionCookie(request, response, '', 0)
 }
 
 async function requireAuth(request, response, next) {
@@ -568,8 +603,13 @@ async function requireAuth(request, response, next) {
 }
 
 const app = express()
+app.set('trust proxy', 1)
+app.use((_request, response, next) => {
+  response.setHeader('X-Content-Type-Options', 'nosniff')
+  response.setHeader('Cache-Control', 'no-store')
+  next()
+})
 app.use(express.json())
-app.use('/uploads', express.static(uploadsDir))
 
 app.get('/api/health', (_request, response) => {
   response.json({ ok: true })
@@ -679,7 +719,7 @@ app.post('/api/auth/login', async (request, response, next) => {
       return
     }
 
-    await createSession(response, email)
+    await createSession(request, response, email)
     response.json({ authenticated: true, email })
   } catch (error) {
     next(error)
@@ -1134,6 +1174,11 @@ app.use((_request, response) => {
 })
 
 app.use((error, _request, response, _next) => {
+  if (error instanceof multer.MulterError || error.message === 'Ten typ pliku nie jest dozwolony.') {
+    response.status(400).json({ message: error.message })
+    return
+  }
+
   console.error(error)
   response.status(500).json({ message: 'Wystapil blad serwera.' })
 })

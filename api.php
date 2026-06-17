@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
 
 $requiredPhpVersion = '7.4.0';
 if (version_compare(PHP_VERSION, $requiredPhpVersion, '<')) {
@@ -23,6 +25,18 @@ $legacyDataFile = __DIR__ . '/server/data/budowa.json';
 $exampleDataFile = __DIR__ . '/server/data/budowa.example.json';
 $sessionCookieName = 'budowa_session';
 $richTextLimit = 50000;
+$privateDirectoryMode = 0750;
+$privateFileMode = 0640;
+$allowedUploadExtensions = ['avif', 'csv', 'doc', 'docx', 'gif', 'heic', 'heif', 'jpeg', 'jpg', 'pdf', 'png', 'txt', 'webp', 'xls', 'xlsx'];
+$allowedUploadMimeTypes = [
+    'application/msword',
+    'application/pdf',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/csv',
+    'text/plain',
+];
 
 $initialState = [
     'tasks' => [
@@ -123,12 +137,15 @@ function readStorageFile(string $file, array $fallback): array
 
 function writeStorageFile(string $file, array $payload)
 {
+    global $privateDirectoryMode, $privateFileMode;
     $dir = dirname($file);
     if (!is_dir($dir)) {
-        mkdir($dir, 0775, true);
+        mkdir($dir, $privateDirectoryMode, true);
     }
 
     file_put_contents($file, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    @chmod($dir, $privateDirectoryMode);
+    @chmod($file, $privateFileMode);
 }
 
 function getUsers(string $usersFile): array
@@ -170,7 +187,7 @@ function cookieOptions(int $expires): array
     return [
         'expires' => $expires,
         'path' => '/',
-        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https',
         'httponly' => true,
         'samesite' => 'Lax',
     ];
@@ -242,24 +259,30 @@ function readJsonBody(): array
 
 function ensureStorage(array $initialState, string $dataDir, string $uploadsDir, string $dataFile, string $legacyDataFile, string $exampleDataFile)
 {
+    global $privateDirectoryMode, $privateFileMode;
     if (!is_dir($dataDir)) {
-        mkdir($dataDir, 0775, true);
+        mkdir($dataDir, $privateDirectoryMode, true);
     }
     if (!is_dir($uploadsDir)) {
-        mkdir($uploadsDir, 0775, true);
+        mkdir($uploadsDir, $privateDirectoryMode, true);
     }
+    @chmod($dataDir, $privateDirectoryMode);
+    @chmod($uploadsDir, $privateDirectoryMode);
     if (!is_file($dataFile)) {
         if (is_file($legacyDataFile)) {
             copy($legacyDataFile, $dataFile);
+            @chmod($dataFile, $privateFileMode);
             return;
         }
 
         if (is_file($exampleDataFile)) {
             copy($exampleDataFile, $dataFile);
+            @chmod($dataFile, $privateFileMode);
             return;
         }
 
         file_put_contents($dataFile, json_encode($initialState, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        @chmod($dataFile, $privateFileMode);
     }
 }
 
@@ -284,7 +307,9 @@ function readState(string $dataFile): array
 
 function writeState(string $dataFile, array $state)
 {
+    global $privateFileMode;
     file_put_contents($dataFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    @chmod($dataFile, $privateFileMode);
 }
 
 function cleanText($value, string $fallback = ''): string
@@ -558,13 +583,43 @@ function uploadedFiles(string $field): array
     return $files;
 }
 
+function isAllowedUploadedFile(array $file): bool
+{
+    global $allowedUploadExtensions, $allowedUploadMimeTypes;
+
+    $originalName = basename((string)($file['name'] ?? ''));
+    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    $reportedMimeType = strtolower((string)($file['type'] ?? ''));
+    $detectedMimeType = '';
+
+    if (is_file((string)($file['tmp_name'] ?? ''))) {
+        $detectedMimeType = strtolower(mime_content_type((string)$file['tmp_name']) ?: '');
+    }
+
+    if (!in_array($extension, $allowedUploadExtensions, true)) {
+        return false;
+    }
+
+    if (strpos($reportedMimeType, 'image/') === 0 || strpos($detectedMimeType, 'image/') === 0) {
+        return true;
+    }
+
+    return in_array($reportedMimeType, $allowedUploadMimeTypes, true)
+        || in_array($detectedMimeType, $allowedUploadMimeTypes, true);
+}
+
 function saveUploadedFiles(string $field, string $uploadsDir, string $fallbackBaseName): array
 {
+    global $privateFileMode;
     $attachments = [];
 
     foreach (uploadedFiles($field) as $file) {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$file['tmp_name'])) {
             continue;
+        }
+
+        if (!isAllowedUploadedFile($file)) {
+            respond(['message' => 'Ten typ pliku nie jest dozwolony.'], 400);
         }
 
         $originalName = basename((string)$file['name']);
@@ -576,6 +631,7 @@ function saveUploadedFiles(string $field, string $uploadsDir, string $fallbackBa
         if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
             respond(['message' => 'Nie udalo sie zapisac zalacznika.'], 500);
         }
+        @chmod($target, $privateFileMode);
 
         $attachments[] = [
             'name' => $originalName,

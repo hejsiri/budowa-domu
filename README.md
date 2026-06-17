@@ -110,7 +110,7 @@ git pull
 npm install
 npm run build
 mkdir -p storage uploads
-chmod 775 storage uploads
+chmod 750 storage uploads
 ```
 
 Jeśli hosting nie ma Node.js, można zbudować projekt lokalnie i wgrać gotowe pliki z repozytorium.
