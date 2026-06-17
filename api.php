@@ -817,16 +817,39 @@ try {
 
     if ($resource === 'wallet' && $method === 'POST' && $action === 'transactions') {
         $amount = cleanAmount($_POST['amount'] ?? 0);
+        $description = cleanText($_POST['description'] ?? '');
+
+        if ($description === '' || $amount <= 0) {
+            respond(['message' => 'Podaj opis i prawidlowa kwote transakcji.'], 400);
+        }
+
+        if ($id !== '') {
+            $state['wallet'] = normalizeWallet($state['wallet'] ?? []);
+            $updatedTransaction = null;
+            foreach ($state['wallet']['transactions'] as &$transaction) {
+                if ((string)($transaction['id'] ?? '') === $id) {
+                    $transaction['date'] = cleanText($_POST['date'] ?? '', date('Y-m-d'));
+                    $transaction['description'] = $description;
+                    $transaction['amount'] = cleanAmount($transaction['amount'] ?? 0) < 0 ? -abs($amount) : abs($amount);
+                    $updatedTransaction = $transaction;
+                }
+            }
+            unset($transaction);
+
+            if (!is_array($updatedTransaction)) {
+                respond(['message' => 'Nie znaleziono transakcji Portfela.'], 404);
+            }
+
+            writeState($dataFile, $state);
+            respond($state);
+        }
+
         $transaction = [
             'id' => uuid(),
             'date' => cleanText($_POST['date'] ?? '', date('Y-m-d')),
-            'description' => cleanText($_POST['description'] ?? ''),
+            'description' => $description,
             'amount' => abs($amount),
         ];
-
-        if ($transaction['description'] === '' || $amount <= 0) {
-            respond(['message' => 'Podaj opis i prawidlowa kwote transakcji.'], 400);
-        }
 
         $state['wallet'] = normalizeWallet($state['wallet'] ?? []);
         array_unshift($state['wallet']['transactions'], $transaction);

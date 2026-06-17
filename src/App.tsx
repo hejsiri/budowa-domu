@@ -288,6 +288,19 @@ function calendarHref(token?: string) {
   return new URL(path, window.location.href).toString()
 }
 
+function walletTransactionEndpoint(id?: string) {
+  if (isDevServer) {
+    return `/api/wallet/transactions${id ? `/${id}` : ''}`
+  }
+
+  const params = new URLSearchParams({ resource: 'wallet', action: 'transactions' })
+  if (id) {
+    params.set('id', id)
+  }
+
+  return `api.php?${params.toString()}`
+}
+
 function isImageAttachment(attachment: Attachment) {
   return attachment.mimeType.startsWith('image/')
 }
@@ -480,6 +493,7 @@ function App() {
   const [notePreview, setNotePreview] = useState<NotePreview | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [editingCostId, setEditingCostId] = useState<string | null>(null)
+  const [editingWalletTransactionId, setEditingWalletTransactionId] = useState<string | null>(null)
   const [taskDocumentFiles, setTaskDocumentFiles] = useState<File[]>([])
   const [taskImageFiles, setTaskImageFiles] = useState<File[]>([])
   const [costDocumentFiles, setCostDocumentFiles] = useState<File[]>([])
@@ -681,6 +695,7 @@ function App() {
     setActiveModal(null)
     setEditingTaskId(null)
     setEditingCostId(null)
+    setEditingWalletTransactionId(null)
   }
 
   function closeAttachmentPreview() {
@@ -767,6 +782,17 @@ function App() {
 
   function openWalletModal() {
     resetWalletForm()
+    setEditingWalletTransactionId(null)
+    setActiveModal('wallet')
+  }
+
+  function openEditWalletTransactionModal(transaction: WalletTransaction) {
+    setWalletForm({
+      date: transaction.date || today,
+      description: transaction.description,
+      amount: formatAmountInput(Math.abs(transaction.amount)),
+    })
+    setEditingWalletTransactionId(transaction.id)
     setActiveModal('wallet')
   }
 
@@ -1090,7 +1116,7 @@ function App() {
     }
   }
 
-  async function addWalletTransaction(event: FormEvent<HTMLFormElement>) {
+  async function saveWalletTransaction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const amount = parseAmountInput(walletForm.amount)
     if (!walletForm.description.trim() || !Number.isFinite(amount) || amount <= 0) {
@@ -1103,13 +1129,14 @@ function App() {
     body.append('amount', String(amount))
 
     const saved = await runServerAction(() =>
-      requestJson<WalletTransaction | AppState>(apiEndpoint('wallet', undefined, 'transactions'), {
+      requestJson<WalletTransaction | AppState>(walletTransactionEndpoint(editingWalletTransactionId || undefined), {
         method: 'POST',
         body,
       }),
     )
     if (saved) {
       resetWalletForm()
+      setEditingWalletTransactionId(null)
       closeModal()
     }
   }
@@ -1769,6 +1796,15 @@ function App() {
                   </div>
                   <p>{transaction.date || 'bez daty'}</p>
                 </div>
+                <div className="item-actions">
+                  <button
+                    className="icon-button edit-button"
+                    onClick={() => openEditWalletTransactionModal(transaction)}
+                    title="Edytuj operację"
+                  >
+                    <SquarePen size={17} />
+                  </button>
+                </div>
               </article>
             ))}
           </div>
@@ -1818,7 +1854,9 @@ function App() {
                         ? 'Edytuj wydatek'
                         : 'Dodaj wydatek'
                       : activeModal === 'wallet'
-                        ? 'Dodaj środki'
+                        ? editingWalletTransactionId
+                          ? 'Edytuj operację'
+                          : 'Dodaj środki'
                       : 'Ustawienia'}
                 </h2>
               </div>
@@ -1915,7 +1953,7 @@ function App() {
                 </div>
               </form>
             ) : activeModal === 'wallet' ? (
-              <form className="entry-form modal-form" onSubmit={addWalletTransaction}>
+              <form className="entry-form modal-form" onSubmit={saveWalletTransaction}>
                 <label>
                   <span>Data</span>
                   <input
@@ -1948,8 +1986,8 @@ function App() {
                     Anuluj
                   </button>
                   <button type="submit" className="primary-action">
-                    <Plus size={18} />
-                    Dodaj środki
+                    {editingWalletTransactionId ? <Check size={18} /> : <Plus size={18} />}
+                    {editingWalletTransactionId ? 'Zapisz zmiany' : 'Dodaj środki'}
                   </button>
                 </div>
               </form>

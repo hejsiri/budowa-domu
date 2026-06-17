@@ -792,6 +792,45 @@ app.post('/api/wallet/transactions', upload.none(), async (request, response, ne
   }
 })
 
+app.post('/api/wallet/transactions/:id', upload.none(), async (request, response, next) => {
+  try {
+    const state = await readState()
+    const amount = cleanAmount(request.body.amount)
+    const description = cleanText(request.body.description)
+    let updatedTransaction = null
+
+    if (!description || !Number.isFinite(amount) || amount <= 0) {
+      response.status(400).json({ message: 'Podaj opis i prawidlowa kwote transakcji.' })
+      return
+    }
+
+    state.wallet = normalizeWallet(state.wallet)
+    state.wallet.transactions = state.wallet.transactions.map((transaction) => {
+      if (transaction.id !== request.params.id) {
+        return transaction
+      }
+
+      updatedTransaction = {
+        ...transaction,
+        date: cleanText(request.body.date, getToday()),
+        description,
+        amount: transaction.amount < 0 ? -Math.abs(amount) : Math.abs(amount),
+      }
+      return updatedTransaction
+    })
+
+    if (!updatedTransaction) {
+      response.status(404).json({ message: 'Nie znaleziono transakcji Portfela.' })
+      return
+    }
+
+    await writeState(state)
+    response.json(state)
+  } catch (error) {
+    next(error)
+  }
+})
+
 app.get('/api/file', async (request, response, next) => {
   try {
     const relativePath = String(request.query.path || '').replace(/^\//, '')
