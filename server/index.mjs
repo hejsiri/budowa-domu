@@ -15,6 +15,7 @@ const sessionsFile = path.join(storageDir, 'sessions.json')
 const legacyDataFile = path.join(__dirname, 'data', 'budowa.json')
 const exampleDataFile = path.join(__dirname, 'data', 'budowa.example.json')
 const sessionCookieName = 'budowa_session'
+const sessionLifetimeSeconds = 60 * 60 * 24
 const port = Number(process.env.PORT || 4174)
 const richTextLimit = 50000
 const privateDirectoryMode = 0o750
@@ -567,11 +568,11 @@ async function createSession(request, response, email) {
   sessions.sessions.push({
     tokenHash: hashSecret(token),
     email,
-    expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 14,
+    expiresAt: Date.now() + 1000 * sessionLifetimeSeconds,
   })
 
   await writeStorageFile(sessionsFile, sessions)
-  setSessionCookie(request, response, token, 60 * 60 * 24 * 14)
+  setSessionCookie(request, response, token, sessionLifetimeSeconds)
 }
 
 async function getCurrentUser(request) {

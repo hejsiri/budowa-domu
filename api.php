@@ -26,6 +26,7 @@ $legacyDataFile = __DIR__ . '/server/data/budowa.json';
 $exampleDataFile = __DIR__ . '/server/data/budowa.example.json';
 $sessionCookieName = 'budowa_session';
 $richTextLimit = 50000;
+$sessionLifetimeSeconds = 60 * 60 * 24;
 $privateDirectoryMode = 0750;
 $privateFileMode = 0640;
 $allowedUploadExtensions = ['avif', 'csv', 'doc', 'docx', 'gif', 'heic', 'heif', 'jpeg', 'jpg', 'pdf', 'png', 'txt', 'webp', 'xls', 'xlsx'];
@@ -222,6 +223,7 @@ function cookieOptions(int $expires): array
 
 function createSession(string $sessionsFile, string $email)
 {
+    global $sessionLifetimeSeconds;
     $token = bin2hex(random_bytes(32));
     $sessions = readStorageFile($sessionsFile, ['sessions' => []]);
     $sessions['sessions'] = array_values(array_filter(
@@ -233,11 +235,11 @@ function createSession(string $sessionsFile, string $email)
     $sessions['sessions'][] = [
         'tokenHash' => hash('sha256', $token),
         'email' => $email,
-        'expiresAt' => time() + 60 * 60 * 24 * 14,
+        'expiresAt' => time() + $sessionLifetimeSeconds,
     ];
 
     writeStorageFile($sessionsFile, $sessions);
-    setcookie('budowa_session', $token, cookieOptions(time() + 60 * 60 * 24 * 14));
+    setcookie('budowa_session', $token, cookieOptions(time() + $sessionLifetimeSeconds));
 }
 
 function currentUser(string $sessionsFile)
