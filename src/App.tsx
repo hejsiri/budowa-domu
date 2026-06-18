@@ -83,6 +83,7 @@ type Cost = {
   status: PaymentStatus
   paidDate: string
   walletTransactionId?: string
+  excludeFromSummary?: boolean
   attachment?: Attachment
   attachments?: Attachment[]
 }
@@ -525,6 +526,7 @@ function App() {
     status: 'planned' as PaymentStatus,
     paidDate: '',
     useWallet: false,
+    excludeFromSummary: false,
   })
   const [walletForm, setWalletForm] = useState({
     date: today,
@@ -677,6 +679,7 @@ function App() {
       status: 'planned',
       paidDate: '',
       useWallet: false,
+      excludeFromSummary: false,
     })
     setCostDocumentFiles([])
     setCostImageFiles([])
@@ -814,6 +817,7 @@ function App() {
       status: cost.status,
       paidDate: cost.paidDate,
       useWallet: Boolean(cost.walletTransactionId),
+      excludeFromSummary: Boolean(cost.excludeFromSummary),
     })
     setCostDocumentFiles([])
     setCostImageFiles([])
@@ -829,9 +833,10 @@ function App() {
   }
 
   const summary = useMemo(() => {
-    const paidCosts = state.costs.filter((cost) => cost.status === 'paid')
-    const unpaidCosts = state.costs.filter((cost) => cost.status === 'unpaid')
-    const plannedCosts = state.costs.filter((cost) => cost.status === 'planned')
+    const summaryCosts = state.costs.filter((cost) => !cost.excludeFromSummary)
+    const paidCosts = summaryCosts.filter((cost) => cost.status === 'paid')
+    const unpaidCosts = summaryCosts.filter((cost) => cost.status === 'unpaid')
+    const plannedCosts = summaryCosts.filter((cost) => cost.status === 'planned')
     const paid = paidCosts.reduce((sum, cost) => sum + cost.amount, 0)
     const unpaid = unpaidCosts.reduce((sum, cost) => sum + cost.amount, 0)
     const planned = plannedCosts.reduce((sum, cost) => sum + cost.amount, 0)
@@ -1100,6 +1105,7 @@ function App() {
     body.append('status', costForm.status)
     body.append('paidDate', costForm.paidDate)
     body.append('useWallet', costForm.status === 'paid' && costForm.useWallet ? '1' : '0')
+    body.append('excludeFromSummary', costForm.excludeFromSummary ? '1' : '0')
     body.append('removeAttachments', JSON.stringify(costRemovePaths))
     costDocumentFiles.forEach((file) => body.append('documents[]', file))
     costImageFiles.forEach((file) => body.append('images[]', file))
@@ -1831,6 +1837,7 @@ function App() {
                       </div>
                       <p>{cost.area || 'Fundamenty'} · {cost.category}</p>
                       <p>{costStatusLabel(cost)}</p>
+                      {cost.excludeFromSummary && <p className="cost-note">Nie uwzględniany w podsumowaniu</p>}
                       <p className="cost-split">
                         {costSplitLabel(cost, settings)}
                       </p>
@@ -2347,6 +2354,14 @@ function App() {
                     onChange={(event) => setCostForm({ ...costForm, useWallet: event.target.checked })}
                   />
                   <span>Pobierz środki z Portfela</span>
+                </label>
+                <label className="checkbox-field wide">
+                  <input
+                    type="checkbox"
+                    checked={costForm.excludeFromSummary}
+                    onChange={(event) => setCostForm({ ...costForm, excludeFromSummary: event.target.checked })}
+                  />
+                  <span>Nie uwzględniaj w podsumowaniu</span>
                 </label>
                 <div className="quick-split wide" aria-label="Szybkie ustawienia płatności">
                   <button type="button" className={costForm.payer === 'me' ? 'active' : ''} onClick={() => setCostPayer('me')}>

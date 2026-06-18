@@ -1128,6 +1128,7 @@ app.post('/api/costs', attachmentUpload, async (request, response, next) => {
       commentHtml: cleanRichText(request.body.commentHtml),
       status,
       paidDate: status === 'paid' ? cleanText(request.body.paidDate, getToday()) : '',
+      excludeFromSummary: isChecked(request.body.excludeFromSummary),
       attachments: uploadedAttachments(request),
     }
 
@@ -1174,6 +1175,7 @@ async function updateCost(request, response, next) {
         commentHtml: cleanRichText(request.body.commentHtml),
         status,
         paidDate: status === 'paid' ? cleanText(request.body.paidDate, getToday()) : '',
+        excludeFromSummary: isChecked(request.body.excludeFromSummary),
         attachments: [...filterRemovedAttachments(currentAttachments, removePaths), ...attachments],
       }
       delete updatedCost.attachment

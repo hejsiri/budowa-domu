@@ -1172,6 +1172,7 @@ try {
                     $cost['commentHtml'] = cleanRichText($_POST['commentHtml'] ?? '');
                     $cost['status'] = $status;
                     $cost['paidDate'] = $status === 'paid' ? cleanText($_POST['paidDate'] ?? '', date('Y-m-d')) : '';
+                    $cost['excludeFromSummary'] = isChecked($_POST['excludeFromSummary'] ?? '');
                     $cost['attachments'] = array_values(array_merge($existingAttachments, $attachments));
                     unset($cost['attachment']);
                     syncCostWalletTransaction($state, $cost, isChecked($_POST['useWallet'] ?? ''));
@@ -1196,6 +1197,7 @@ try {
             'commentHtml' => cleanRichText($_POST['commentHtml'] ?? ''),
             'status' => $status,
             'paidDate' => $status === 'paid' ? cleanText($_POST['paidDate'] ?? '', date('Y-m-d')) : '',
+            'excludeFromSummary' => isChecked($_POST['excludeFromSummary'] ?? ''),
             'attachments' => $attachments,
         ];
 

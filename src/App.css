@@ -1186,6 +1186,12 @@ input:disabled {
   font-weight: 400;
 }
 
+.cost-note {
+  color: #873426;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .quick-split {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
