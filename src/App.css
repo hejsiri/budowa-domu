@@ -858,13 +858,45 @@ input:disabled {
 }
 
 .drop-input em {
-  align-items: flex-start;
   min-height: 70px;
   border-width: 1.5px;
   border-color: #aebbc5;
   background: #fbfdfe;
   line-height: 1.35;
-  white-space: pre-line;
+  white-space: normal;
+}
+
+.drop-input .file-list-em {
+  align-items: stretch;
+  padding: 9px;
+}
+
+.selected-file-list {
+  display: grid;
+  width: 100%;
+  gap: 6px;
+}
+
+.selected-file-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border: 1px solid #d8e1e8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--accent);
+  background: #ffffff;
+  line-height: 1.25;
+}
+
+.selected-file-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.selected-file-row svg {
+  margin-top: 1px;
 }
 
 .drop-input.is-dragging em {

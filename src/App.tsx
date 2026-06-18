@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, Dispatch, DragEvent, FormEvent, SetStateAction } from 'react'
+import type { ChangeEvent, Dispatch, DragEvent, FormEvent, ReactNode, SetStateAction } from 'react'
 import {
   BanknoteArrowDown,
   Check,
@@ -340,12 +340,36 @@ function isImageFile(file: File) {
   return file.type.startsWith('image/') || /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)
 }
 
-function fileListLabel(files: File[], emptyLabel: string) {
+function FileDropLabel({
+  files,
+  emptyLabel,
+  icon,
+}: {
+  files: File[]
+  emptyLabel: string
+  icon: ReactNode
+}) {
   if (files.length === 0) {
-    return emptyLabel
+    return (
+      <em>
+        {icon}
+        <span>{emptyLabel}</span>
+      </em>
+    )
   }
 
-  return files.map((file) => file.name).join('\n')
+  return (
+    <em className="file-list-em">
+      <span className="selected-file-list">
+        {files.map((file) => (
+          <span className="selected-file-row" key={fileKey(file)}>
+            {icon}
+            <span>{file.name}</span>
+          </span>
+        ))}
+      </span>
+    </em>
+  )
 }
 
 async function resizeImageFile(file: File, maxWidth = 1920, maxHeight = 1080) {
@@ -2238,10 +2262,11 @@ function App() {
                 >
                   <span>{editingTaskId ? 'Nowe dokumenty' : 'Dokumenty'}</span>
                   <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,application/pdf" multiple onChange={onDocumentFilesChange(setTaskDocumentFiles)} />
-                  <em>
-                    <FileText size={16} />
-                    {fileListLabel(taskDocumentFiles, editingTaskId ? 'Dodaj lub przeciągnij dokumenty' : 'Dodaj dokumenty')}
-                  </em>
+                  <FileDropLabel
+                    files={taskDocumentFiles}
+                    emptyLabel={editingTaskId ? 'Dodaj lub przeciągnij dokumenty' : 'Dodaj dokumenty'}
+                    icon={<FileText size={16} />}
+                  />
                 </label>
                 <label
                   className={`file-input wide drop-input ${activeDropTarget === 'task-images' ? 'is-dragging' : ''}`}
@@ -2254,10 +2279,11 @@ function App() {
                 >
                   <span>{editingTaskId ? 'Nowe zdjęcia' : 'Zdjęcia'}</span>
                   <input type="file" accept="image/*" multiple onChange={onImageFilesChange(setTaskImageFiles)} />
-                  <em>
-                    <ImageIcon size={16} />
-                    {fileListLabel(taskImageFiles, editingTaskId ? 'Dodaj lub przeciągnij zdjęcia' : 'Dodaj zdjęcia')}
-                  </em>
+                  <FileDropLabel
+                    files={taskImageFiles}
+                    emptyLabel={editingTaskId ? 'Dodaj lub przeciągnij zdjęcia' : 'Dodaj zdjęcia'}
+                    icon={<ImageIcon size={16} />}
+                  />
                 </label>
                 <div className="modal-actions">
                   <button type="button" className="secondary-action" onClick={closeModal}>
@@ -2463,10 +2489,11 @@ function App() {
                 >
                   <span>{editingCostId ? 'Nowe dokumenty' : 'Nowy dokument'}</span>
                   <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,application/pdf" multiple onChange={onDocumentFilesChange(setCostDocumentFiles)} />
-                  <em>
-                    <FileText size={16} />
-                    {fileListLabel(costDocumentFiles, editingCostId ? 'Dodaj lub przeciągnij dokumenty' : 'Dodaj dokumenty')}
-                  </em>
+                  <FileDropLabel
+                    files={costDocumentFiles}
+                    emptyLabel={editingCostId ? 'Dodaj lub przeciągnij dokumenty' : 'Dodaj dokumenty'}
+                    icon={<FileText size={16} />}
+                  />
                 </label>
                 <label
                   className={`file-input wide drop-input ${activeDropTarget === 'cost-images' ? 'is-dragging' : ''}`}
@@ -2479,10 +2506,11 @@ function App() {
                 >
                   <span>{editingCostId ? 'Nowe zdjęcia' : 'Zdjęcia'}</span>
                   <input type="file" accept="image/*" multiple onChange={onImageFilesChange(setCostImageFiles)} />
-                  <em>
-                    <ImageIcon size={16} />
-                    {fileListLabel(costImageFiles, editingCostId ? 'Dodaj lub przeciągnij zdjęcia' : 'Dodaj zdjęcia')}
-                  </em>
+                  <FileDropLabel
+                    files={costImageFiles}
+                    emptyLabel={editingCostId ? 'Dodaj lub przeciągnij zdjęcia' : 'Dodaj zdjęcia'}
+                    icon={<ImageIcon size={16} />}
+                  />
                 </label>
                 <div className="modal-actions">
                   <button type="button" className="secondary-action" onClick={closeModal}>
