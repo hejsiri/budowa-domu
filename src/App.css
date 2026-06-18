@@ -853,12 +853,18 @@ input:disabled {
   white-space: nowrap;
 }
 
+.file-input em svg {
+  flex: 0 0 auto;
+}
+
 .drop-input em {
+  align-items: flex-start;
   min-height: 70px;
   border-width: 1.5px;
   border-color: #aebbc5;
   background: #fbfdfe;
-  white-space: normal;
+  line-height: 1.35;
+  white-space: pre-line;
 }
 
 .drop-input.is-dragging em {

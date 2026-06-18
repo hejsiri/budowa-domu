@@ -345,8 +345,7 @@ function fileListLabel(files: File[], emptyLabel: string) {
     return emptyLabel
   }
 
-  const visibleNames = files.slice(0, 2).map((file) => file.name).join(', ')
-  return files.length > 2 ? `${visibleNames} oraz ${files.length - 2} więcej` : visibleNames
+  return files.map((file) => file.name).join('\n')
 }
 
 async function resizeImageFile(file: File, maxWidth = 1920, maxHeight = 1080) {
@@ -501,8 +500,7 @@ function App() {
   const [costImageFiles, setCostImageFiles] = useState<File[]>([])
   const [taskRemovePaths, setTaskRemovePaths] = useState<string[]>([])
   const [costRemovePaths, setCostRemovePaths] = useState<string[]>([])
-  const [taskDropActive, setTaskDropActive] = useState(false)
-  const [invoiceDropActive, setInvoiceDropActive] = useState(false)
+  const [activeDropTarget, setActiveDropTarget] = useState<string | null>(null)
   const costCommentRef = useRef<HTMLDivElement | null>(null)
   const [taskForm, setTaskForm] = useState({
     title: '',
@@ -1059,19 +1057,31 @@ function App() {
     }
   }
 
-  async function onTaskAttachmentsDrop(event: DragEvent<HTMLLabelElement>) {
+  async function onTaskDocumentsDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
-    setTaskDropActive(false)
+    setActiveDropTarget(null)
     const files = Array.from(event.dataTransfer.files)
     appendFiles(setTaskDocumentFiles, documentFiles(files))
+  }
+
+  async function onTaskImagesDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setActiveDropTarget(null)
+    const files = Array.from(event.dataTransfer.files)
     appendFiles(setTaskImageFiles, await prepareImageFiles(files))
   }
 
-  async function onInvoiceDrop(event: DragEvent<HTMLLabelElement>) {
+  async function onCostDocumentsDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
-    setInvoiceDropActive(false)
+    setActiveDropTarget(null)
     const files = Array.from(event.dataTransfer.files)
     appendFiles(setCostDocumentFiles, documentFiles(files))
+  }
+
+  async function onCostImagesDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setActiveDropTarget(null)
+    const files = Array.from(event.dataTransfer.files)
     appendFiles(setCostImageFiles, await prepareImageFiles(files))
   }
 
@@ -2218,13 +2228,13 @@ function App() {
                   </div>
                 )}
                 <label
-                  className={`file-input wide drop-input ${taskDropActive ? 'is-dragging' : ''}`}
+                  className={`file-input wide drop-input ${activeDropTarget === 'task-documents' ? 'is-dragging' : ''}`}
                   onDragOver={(event) => {
                     event.preventDefault()
-                    setTaskDropActive(true)
+                    setActiveDropTarget('task-documents')
                   }}
-                  onDragLeave={() => setTaskDropActive(false)}
-                  onDrop={onTaskAttachmentsDrop}
+                  onDragLeave={() => setActiveDropTarget(null)}
+                  onDrop={onTaskDocumentsDrop}
                 >
                   <span>{editingTaskId ? 'Nowe dokumenty' : 'Dokumenty'}</span>
                   <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,application/pdf" multiple onChange={onDocumentFilesChange(setTaskDocumentFiles)} />
@@ -2234,13 +2244,13 @@ function App() {
                   </em>
                 </label>
                 <label
-                  className={`file-input wide drop-input ${taskDropActive ? 'is-dragging' : ''}`}
+                  className={`file-input wide drop-input ${activeDropTarget === 'task-images' ? 'is-dragging' : ''}`}
                   onDragOver={(event) => {
                     event.preventDefault()
-                    setTaskDropActive(true)
+                    setActiveDropTarget('task-images')
                   }}
-                  onDragLeave={() => setTaskDropActive(false)}
-                  onDrop={onTaskAttachmentsDrop}
+                  onDragLeave={() => setActiveDropTarget(null)}
+                  onDrop={onTaskImagesDrop}
                 >
                   <span>{editingTaskId ? 'Nowe zdjęcia' : 'Zdjęcia'}</span>
                   <input type="file" accept="image/*" multiple onChange={onImageFilesChange(setTaskImageFiles)} />
@@ -2443,13 +2453,13 @@ function App() {
                   </div>
                 )}
                 <label
-                  className={`file-input wide drop-input ${invoiceDropActive ? 'is-dragging' : ''}`}
+                  className={`file-input wide drop-input ${activeDropTarget === 'cost-documents' ? 'is-dragging' : ''}`}
                   onDragOver={(event) => {
                     event.preventDefault()
-                    setInvoiceDropActive(true)
+                    setActiveDropTarget('cost-documents')
                   }}
-                  onDragLeave={() => setInvoiceDropActive(false)}
-                  onDrop={onInvoiceDrop}
+                  onDragLeave={() => setActiveDropTarget(null)}
+                  onDrop={onCostDocumentsDrop}
                 >
                   <span>{editingCostId ? 'Nowe dokumenty' : 'Nowy dokument'}</span>
                   <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,application/pdf" multiple onChange={onDocumentFilesChange(setCostDocumentFiles)} />
@@ -2459,13 +2469,13 @@ function App() {
                   </em>
                 </label>
                 <label
-                  className={`file-input wide drop-input ${invoiceDropActive ? 'is-dragging' : ''}`}
+                  className={`file-input wide drop-input ${activeDropTarget === 'cost-images' ? 'is-dragging' : ''}`}
                   onDragOver={(event) => {
                     event.preventDefault()
-                    setInvoiceDropActive(true)
+                    setActiveDropTarget('cost-images')
                   }}
-                  onDragLeave={() => setInvoiceDropActive(false)}
-                  onDrop={onInvoiceDrop}
+                  onDragLeave={() => setActiveDropTarget(null)}
+                  onDrop={onCostImagesDrop}
                 >
                   <span>{editingCostId ? 'Nowe zdjęcia' : 'Zdjęcia'}</span>
                   <input type="file" accept="image/*" multiple onChange={onImageFilesChange(setCostImageFiles)} />
